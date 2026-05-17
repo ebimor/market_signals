@@ -1,0 +1,27 @@
+{
+  "name": "safeswing-trader",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SafeSwing Trader - Conservative Stock Market Monitoring & Swing Trade Assistant",
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "typescript": "^5.3.3",
+    "axios": "^1.6.2",
+    "lightweight-charts": "^4.0.0",
+    "react-lightweight-charts": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.37",
+    "@types/react-dom": "^18.2.15",
+    "@types/node": "^20.10.0",
+    "vite": "^5.0.2",
+    "@vitejs/plugin-react": "^4.2.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "lint": "eslint src --ext ts,tsx"
+  }
+}
