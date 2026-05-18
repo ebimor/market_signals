@@ -1,0 +1,13 @@
+{
+  "total_trades": 5,
+  "closed_trades": 3,
+  "open_trades": 2,
+  "winning_trades": 2,
+  "losing_trades": 1,
+  "win_rate": 66.67,
+  "total_pnl": 568.75,
+  "best_trade": 425.0,
+  "worst_trade": -175.0,
+  "avg_pnl": 189.58,
+  "profit_factor": 2.45
+}

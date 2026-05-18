@@ -1,0 +1,24 @@
+[
+  {
+    "trade_id": "open_001",
+    "symbol": "AMZN",
+    "entry_price": 168.5,
+    "position_size": 60,
+    "entry_date": "2026-05-15T15:46:22.691145",
+    "stop_loss": 165.0,
+    "take_profit": 175.0,
+    "current_price": 170.25,
+    "status": "open"
+  },
+  {
+    "trade_id": "open_002",
+    "symbol": "MSFT",
+    "entry_price": 381.0,
+    "position_size": 40,
+    "entry_date": "2026-05-16T15:46:22.691147",
+    "stop_loss": 378.0,
+    "take_profit": 388.0,
+    "current_price": 382.1,
+    "status": "open"
+  }
+]

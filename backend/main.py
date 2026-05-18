@@ -15,6 +15,7 @@ import logging
 from backend.config import settings
 from backend.database.db import init_db
 from backend.api.routes import router as market_router
+from backend.api.trading import router as trading_router
 
 # Configure logging
 logging.basicConfig(
@@ -48,6 +49,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(market_router)
+app.include_router(trading_router)
 
 
 @app.get("/health")

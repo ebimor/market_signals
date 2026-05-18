@@ -6,6 +6,11 @@ Conservative Stock Market Monitoring & Swing Trade Assistant
 
 SafeSwing Trader is a desktop application designed to help retail investors identify lower-risk swing-trading opportunities while minimizing exposure to major market crashes. The system prioritizes capital preservation, controlled downside risk, and disciplined exit management over aggressive profit maximization.
 
+## Documentation
+
+- Core documentation index: [docs/DOCUMENTATION_INDEX.md](docs/DOCUMENTATION_INDEX.md)
+- Historical phase/status reports: [docs/archive](docs/archive)
+
 ## Key Features
 
 - **Real-time Market Monitoring**: Track selected stocks with 1-15 minute refresh intervals
@@ -121,6 +126,34 @@ docker-compose up
 ### Health Check
 - `GET /health` - Check API health status
 
+### Trading API (Phase 4c) ✅ IMPLEMENTED
+
+**Signal Management**
+- `GET /api/trading/signals` - Get pending signals
+- `POST /api/trading/signals` - Create new signal
+
+**Approval Workflow**
+- `POST /api/trading/approve` - Approve signal for execution
+- `POST /api/trading/reject` - Reject signal
+
+**Trade Execution**
+- `POST /api/trading/execute` - Execute approved trade
+- `POST /api/trading/close` - Close trade with P&L calculation
+
+**Monitoring**
+- `GET /api/trading/trades/open` - Get open positions
+- `GET /api/trading/trades/history` - Get closed trades with P&L
+
+**Analytics**
+- `GET /api/trading/stats` - Get performance statistics
+- `GET /api/trading/dashboard` - Get complete dashboard
+- `GET /api/trading/status` - Get system status
+
+**See Also:**
+- Interactive API docs: `http://localhost:8000/docs`
+- Full API reference: [PHASE_4C_TRADING_API_COMPLETE.md](PHASE_4C_TRADING_API_COMPLETE.md)
+- Quick start: [QUICK_START.md](QUICK_START.md)
+
 ### Market Data (to be implemented)
 - `GET /api/stocks/{ticker}` - Get stock data
 - `GET /api/watchlists` - List watchlists
@@ -204,27 +237,62 @@ A SELL signal is generated if ANY condition is met:
 - **Correlation Check**: Prevent overexposure to correlated stocks
 - **Portfolio Limits**: Configurable sector and total risk limits
 
-## Roadmap
+## Development Phases
 
-### Phase 1 (MVP)
-- [x] Project setup and structure
-- [ ] Market data collector
-- [ ] Charting interface
-- [ ] Watchlist management
-- [ ] Technical indicators
-- [ ] Signal generation
-- [ ] Basic backtesting
+### Phase 1: Data Management ✅ COMPLETE
+- [x] Auto-download from yfinance with caching
+- [x] Multi-symbol batch downloads
+- [x] CSV cache management
 
-### Phase 2
-- [ ] Broker integration (Alpaca)
-- [ ] Paper trading
-- [ ] Advanced alerting
-- [ ] Mobile app companion
+### Phase 2: Technical Indicators ✅ COMPLETE
+- [x] RSI indicator (14-period standard)
+- [x] MACD indicator (12,26,9 standard)
+- [x] Multi-indicator signal confirmation
+- [x] Confidence scoring
 
-### Phase 3
-- [ ] ML-based trade ranking
-- [ ] Reinforcement learning research
-- [ ] Portfolio optimization
+### Phase 3: Risk Management ✅ COMPLETE
+- [x] Portfolio exposure tracking (50% max)
+- [x] Position sizing (10% max per trade)
+- [x] Daily portfolio limits
+- [x] Constraint enforcement
+
+### Phase 4: Backtesting Engine ✅ COMPLETE
+- [x] Trade execution engine
+- [x] P&L tracking and metrics
+- [x] 20+ performance statistics
+
+### Phase 4b: Strategy Simulator ✅ COMPLETE
+- [x] Historical data loading
+- [x] Signal generation (RSI + MACD + SMA)
+- [x] Trade execution with constraints
+- [x] Position exits (take profit/stop loss)
+- [x] End-to-end backtesting
+
+### Phase 4c: Trading REST API ✅ COMPLETE
+- [x] 10+ REST endpoints
+- [x] Manual trade approval workflow
+- [x] No automatic execution
+- [x] Trade record persistence
+- [x] P&L tracking and analytics
+- [x] FastAPI integration
+- [x] Complete test suite (10/10 passing)
+
+### Phase 4d: Reporting & Visualization ✅ COMPLETE
+- [x] React dashboard (5 components)
+- [x] Signal review interface
+- [x] Trade history table
+- [x] Performance charts (Recharts)
+- [x] Open positions monitor
+- [x] Real-time auto-refresh
+- [x] Responsive design
+- [x] TypeScript type safety
+
+### Phase 5: Live Trading Integration (PLANNED)
+- [ ] Broker API integration (Alpaca, Interactive Brokers)
+- [ ] Real order execution
+- [ ] Live position tracking
+- [ ] Risk monitoring on live trades
+- [ ] Order management
 
 ## Contributing
 

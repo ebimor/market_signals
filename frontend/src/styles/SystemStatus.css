@@ -1,0 +1,92 @@
+.system-status {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  padding: 0.7rem 0.8rem;
+  border-radius: 12px;
+  color: white;
+  min-width: 340px;
+  backdrop-filter: blur(8px);
+}
+
+.system-status.loading {
+  min-width: auto;
+}
+
+.status-top {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.status-indicator {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  white-space: nowrap;
+}
+
+.status-indicator.running {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: rgba(167, 243, 208, 0.6);
+}
+
+.status-indicator.stopped {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: rgba(254, 202, 202, 0.6);
+}
+
+.status-time {
+  font-size: 0.75rem;
+  font-weight: 500;
+  opacity: 0.95;
+  white-space: nowrap;
+}
+
+.status-metrics {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.metric-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 0.28rem 0.5rem;
+  min-width: 74px;
+  white-space: nowrap;
+}
+
+.metric-chip.total {
+  background: rgba(17, 24, 39, 0.24);
+}
+
+.metric-label {
+  font-size: 0.7rem;
+  opacity: 0.88;
+}
+
+.metric-value {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+@media (max-width: 768px) {
+  .system-status {
+    min-width: 100%;
+  }
+}

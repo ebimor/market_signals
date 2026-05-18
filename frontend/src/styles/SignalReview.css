@@ -1,0 +1,212 @@
+.signal-review {
+  background: #ffffff;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.signal-review h2 {
+  margin-bottom: 1.5rem;
+  color: #111827;
+  font-size: 1.5rem;
+}
+
+.signals-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.signal-card {
+  border: 2px solid #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.signal-card:hover {
+  border-color: #2563eb;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+}
+
+.signal-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.signal-type {
+  padding: 0.5rem 1rem;
+  border-radius: 0.25rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.signal-type.buy {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.signal-type.sell {
+  background: #fee2e2;
+  color: #7f1d1d;
+}
+
+.signal-type.exit {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.signal-header h3 {
+  flex: 1;
+  font-size: 1.3rem;
+  color: #111827;
+}
+
+.confidence {
+  background: #2563eb;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.signal-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.detail-row label {
+  font-weight: 500;
+  color: #4b5563;
+  font-size: 0.9rem;
+}
+
+.detail-row span {
+  font-weight: 600;
+  color: #111827;
+}
+
+.signal-reason {
+  background: #f9fafb;
+  padding: 0.75rem 1rem;
+  border-radius: 0.25rem;
+  margin-bottom: 1rem;
+  border-left: 3px solid #2563eb;
+}
+
+.signal-reason small {
+  color: #4b5563;
+  line-height: 1.5;
+}
+
+.modifications {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: #f3f4f6;
+  border-radius: 0.25rem;
+}
+
+.modifications label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #4b5563;
+}
+
+.modifications input {
+  padding: 0.5rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.25rem;
+  font-size: 0.9rem;
+  background: #ffffff;
+  color: #111827;
+}
+
+.modifications input:disabled {
+  background: #f9fafb;
+  cursor: not-allowed;
+}
+
+.signal-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  font-size: 0.95rem;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-approve {
+  background: var(--secondary);
+  color: white;
+}
+
+.btn-approve:hover:not(:disabled) {
+  background: #059669;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.btn-reject {
+  background: var(--danger);
+  color: white;
+}
+
+.btn-reject:hover:not(:disabled) {
+  background: #dc2626;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+@media (max-width: 768px) {
+  .signal-card {
+    padding: 1rem;
+  }
+
+  .signal-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .signal-details,
+  .modifications {
+    grid-template-columns: 1fr;
+  }
+
+  .signal-actions {
+    justify-content: stretch;
+  }
+
+  .signal-actions .btn {
+    flex: 1;
+  }
+}

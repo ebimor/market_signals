@@ -1,0 +1,38 @@
+[
+  {
+    "signal_id": "sig_001",
+    "symbol": "AAPL",
+    "signal_type": "BUY",
+    "current_price": 150.25,
+    "confidence": 0.85,
+    "reason": "RSI oversold (28) + MACD bullish crossover",
+    "stop_loss": 148.0,
+    "take_profit": 155.5,
+    "atr": 2.15,
+    "timestamp": "2026-05-17T15:46:22.691125"
+  },
+  {
+    "signal_id": "sig_002",
+    "symbol": "TSLA",
+    "signal_type": "BUY",
+    "current_price": 245.75,
+    "confidence": 0.78,
+    "reason": "RSI bounced from 32 + volume surge",
+    "stop_loss": 242.0,
+    "take_profit": 252.0,
+    "atr": 3.45,
+    "timestamp": "2026-05-17T15:46:22.691133"
+  },
+  {
+    "signal_id": "sig_003",
+    "symbol": "MSFT",
+    "signal_type": "SELL",
+    "current_price": 382.1,
+    "confidence": 0.72,
+    "reason": "RSI overbought (68) + resistance at 385",
+    "stop_loss": 385.0,
+    "take_profit": 375.0,
+    "atr": 2.8,
+    "timestamp": "2026-05-17T15:46:22.691134"
+  }
+]

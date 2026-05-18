@@ -1,0 +1,41 @@
+[
+  {
+    "trade_id": "trade_001",
+    "symbol": "AAPL",
+    "entry_price": 148.5,
+    "exit_price": 152.75,
+    "position_size": 100,
+    "entry_date": "2026-05-12T15:46:22.691135",
+    "exit_date": "2026-05-14T15:46:22.691139",
+    "pnl": 425.0,
+    "pnl_percent": 2.85,
+    "exit_reason": "Take profit hit",
+    "status": "closed"
+  },
+  {
+    "trade_id": "trade_002",
+    "symbol": "TSLA",
+    "entry_price": 242.0,
+    "exit_price": 238.5,
+    "position_size": 50,
+    "entry_date": "2026-05-07T15:46:22.691140",
+    "exit_date": "2026-05-10T15:46:22.691142",
+    "pnl": -175.0,
+    "pnl_percent": -1.82,
+    "exit_reason": "Stop loss hit",
+    "status": "closed"
+  },
+  {
+    "trade_id": "trade_003",
+    "symbol": "GOOGL",
+    "entry_price": 138.25,
+    "exit_price": 142.5,
+    "position_size": 75,
+    "entry_date": "2026-05-02T15:46:22.691143",
+    "exit_date": "2026-05-05T15:46:22.691144",
+    "pnl": 318.75,
+    "pnl_percent": 3.07,
+    "exit_reason": "Take profit hit",
+    "status": "closed"
+  }
+]

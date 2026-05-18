@@ -1,0 +1,117 @@
+.open-positions {
+  background: #ffffff;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.open-positions h2 {
+  margin-bottom: 1.5rem;
+  color: #111827;
+  font-size: 1.5rem;
+}
+
+.open-positions .positions-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.open-positions .position-card {
+  border: 1px solid #e5e7eb;
+  border-left: 3px solid #f59e0b;
+  border-radius: 8px;
+  padding: 1.5rem;
+  background: #ffffff;
+  transition: all 0.2s ease;
+}
+
+.open-positions .position-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.open-positions .position-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.open-positions .position-header h3 {
+  font-size: 1.3rem;
+  color: #111827;
+  font-weight: 700;
+}
+
+.open-positions .position-size {
+  background: #f3f4f6;
+  padding: 0.4rem 0.9rem;
+  border-radius: 4px;
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.9rem;
+}
+
+.open-positions .position-details {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.open-positions .detail {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  padding: 0.65rem;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.open-positions .detail label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 0.3rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.open-positions .detail span {
+  display: block;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.open-positions .progress-bars {
+  padding: 0.75rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+}
+
+.open-positions .progress-label {
+  font-size: 0.85rem;
+  color: #4b5563;
+  margin-bottom: 0.4rem;
+  font-weight: 500;
+}
+
+.open-positions .progress-label:last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 768px) {
+  .open-positions .positions-list {
+    grid-template-columns: 1fr;
+  }
+
+  .open-positions .position-details {
+    grid-template-columns: 1fr;
+  }
+}
+

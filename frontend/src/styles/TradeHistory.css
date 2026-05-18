@@ -1,0 +1,115 @@
+.trade-history {
+  background: #ffffff;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.trade-history h2 {
+  margin-bottom: 1.5rem;
+  color: #111827;
+  font-size: 1.5rem;
+}
+
+.table-container {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+table thead {
+  background: #f9fafb;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+table th {
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #6b7280;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+table tbody tr {
+  border-bottom: 1px solid #f3f4f6;
+  transition: background 0.15s ease;
+}
+
+table tbody tr:hover {
+  background: #f9fafb;
+}
+
+table td {
+  padding: 1rem;
+  font-size: 0.95rem;
+  color: #111827;
+}
+
+table tr.profit {
+  background: rgba(16, 185, 129, 0.05);
+}
+
+table tr.loss {
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.symbol {
+  font-weight: 700;
+  color: #111827;
+}
+
+.pnl {
+  font-weight: 700;
+}
+
+.pnl.positive {
+  color: #059669;
+}
+
+.pnl.negative {
+  color: #dc2626;
+}
+
+.return {
+  font-weight: 600;
+}
+
+.return.positive {
+  color: #059669;
+}
+
+.return.negative {
+  color: #dc2626;
+}
+
+.reason {
+  font-size: 0.85rem;
+  color: #6b7280;
+  max-width: 150px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 768px) {
+  .trade-history {
+    padding: 1rem;
+  }
+
+  table th,
+  table td {
+    padding: 0.75rem 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  .table-container {
+    font-size: 0.8rem;
+  }
+}
+
