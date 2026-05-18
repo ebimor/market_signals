@@ -8,6 +8,8 @@ interface SignalAnalysisProps {
 interface IndicatorData {
   rsi?: { value: number; signal: string; confidence: number; interpretation: string };
   macd?: { macd: number; signal_line: number; histogram: number; signal: string; interpretation: string };
+  data_source?: 'live' | 'simulated';
+  last_updated?: string | null;
   loading: boolean;
   error?: string;
 }
@@ -106,6 +108,8 @@ export const SignalAnalysis: React.FC<SignalAnalysisProps> = ({ signals }) => {
                 ...prev,
                 [signal.symbol]: {
                   loading: false,
+                  data_source: rsiData.data_source ?? macdData.data_source ?? 'live',
+                  last_updated: rsiData.last_updated ?? macdData.last_updated ?? null,
                   rsi: rsiData.current_value !== undefined ? {
                     value: rsiData.current_value,
                     signal: rsiData.signal,
@@ -188,6 +192,26 @@ export const SignalAnalysis: React.FC<SignalAnalysisProps> = ({ signals }) => {
             <div style={{ background: '#0f1117', borderRadius: '6px', padding: '0.75rem', marginBottom: '1rem', fontSize: '0.85rem', color: '#e2e8f0', fontStyle: 'italic' }}>
               💬 "{signal.reason}"
             </div>
+
+            {/* Data source badge */}
+            {!indicators.loading && (
+              <div style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                {indicators.data_source === 'live' ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.6rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600, background: '#1c4532', color: '#68d391', border: '1px solid #2f855a' }}>
+                    📡 Live data
+                  </span>
+                ) : indicators.data_source === 'simulated' ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.6rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600, background: '#744210', color: '#f6ad55', border: '1px solid #b7791f' }}>
+                    ⚠️ Simulated data — yfinance unavailable
+                  </span>
+                ) : null}
+                {indicators.last_updated && (
+                  <span style={{ fontSize: '0.72rem', color: '#718096' }}>
+                    Last bar: {new Date(indicators.last_updated).toLocaleDateString()}
+                  </span>
+                )}
+              </div>
+            )}
 
             {/* Live indicator bar */}
             {indicators.loading && (

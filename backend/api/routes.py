@@ -416,6 +416,20 @@ def _generate_mock_price_data(ticker: str, lookback: int, interval: str = "1d") 
     return df
 
 
+def _fetch_price_data(ticker: str, lookback: int, interval: str):
+    """Fetch price data from yfinance; fall back to simulated data.
+
+    Returns:
+        (dataframe, is_simulated): is_simulated=True when yfinance was unavailable.
+    """
+    fetcher = get_fetcher()
+    data = fetcher.get_historical_data(ticker, period=f"{lookback}d", interval=interval)
+    if data is None or data.empty:
+        logger.warning(f"yfinance unavailable for {ticker} — returning simulated data")
+        return _generate_mock_price_data(ticker, min(lookback, 100), interval=interval), True
+    return data, False
+
+
 @router.get("/indicators/rsi/{ticker}")
 async def get_rsi_indicator(
     ticker: str,
@@ -438,16 +452,9 @@ async def get_rsi_indicator(
     """
     try:
         ticker_upper = ticker.upper()
-        
-        # Try to fetch from yfinance first
-        fetcher = get_fetcher()
-        data = fetcher.get_historical_data(ticker_upper, period=f"{lookback}d", interval=interval)
-        
-        # If yfinance fails, use mock data (for sandbox/testing)
-        if data is None or data.empty:
-            logger.warning(f"yfinance fetch failed for {ticker}, using mock data")
-            data = _generate_mock_price_data(ticker_upper, min(lookback, 100), interval=interval)
-        
+
+        data, is_simulated = _fetch_price_data(ticker_upper, lookback, interval)
+
         # Calculate RSI
         rsi_calc = RSI(period=period)
         rsi_values = rsi_calc.calculate(data['Close'])
@@ -490,6 +497,8 @@ async def get_rsi_indicator(
                 "Neutral - Wait for clear signal"
             ),
             "recent_history": recent_history,
+            "data_source": "simulated" if is_simulated else "live",
+            "last_updated": data.index[-1].isoformat() if not is_simulated else None,
             "timestamp": datetime.utcnow().isoformat(),
         }
     
@@ -531,18 +540,11 @@ async def get_macd_indicator(
     """
     try:
         from backend.signals.indicators import MACD
-        
+
         ticker_upper = ticker.upper()
-        
-        # Try to fetch from yfinance first
-        fetcher = get_fetcher()
-        data = fetcher.get_historical_data(ticker_upper, period=f"{lookback}d", interval=interval)
-        
-        # If yfinance fails, use mock data (for sandbox/testing)
-        if data is None or data.empty:
-            logger.warning(f"yfinance fetch failed for {ticker}, using mock data")
-            data = _generate_mock_price_data(ticker_upper, min(lookback, 100), interval=interval)
-        
+
+        data, is_simulated = _fetch_price_data(ticker_upper, lookback, interval)
+
         # Calculate MACD
         macd_calc = MACD(fast=fast, slow=slow, signal=signal)
         macd_line, signal_line, histogram = macd_calc.calculate(data['Close'])
@@ -616,6 +618,8 @@ async def get_macd_indicator(
                 "Neutral - Awaiting signal"
             ),
             "recent_history": recent_history,
+            "data_source": "simulated" if is_simulated else "live",
+            "last_updated": data.index[-1].isoformat() if not is_simulated else None,
             "timestamp": datetime.utcnow().isoformat(),
         }
     
@@ -651,18 +655,11 @@ async def get_ema_indicator(
     """
     try:
         from backend.signals.indicators import EMA
-        
+
         ticker_upper = ticker.upper()
-        
-        # Try to fetch from yfinance first
-        fetcher = get_fetcher()
-        data = fetcher.get_historical_data(ticker_upper, period=f"{lookback}d", interval=interval)
-        
-        # If yfinance fails, use mock data (for sandbox/testing)
-        if data is None or data.empty:
-            logger.warning(f"yfinance fetch failed for {ticker}, using mock data")
-            data = _generate_mock_price_data(ticker_upper, min(lookback, 100), interval=interval)
-        
+
+        data, is_simulated = _fetch_price_data(ticker_upper, lookback, interval)
+
         # Calculate EMA
         ema_calc = EMA(period=period)
         ema_values = ema_calc.calculate(data['Close'])
@@ -721,6 +718,8 @@ async def get_ema_indicator(
             "confidence": round(confidence, 1),
             "interpretation": interpretation,
             "recent_history": recent_history,
+            "data_source": "simulated" if is_simulated else "live",
+            "last_updated": data.index[-1].isoformat() if not is_simulated else None,
             "timestamp": datetime.utcnow().isoformat(),
         }
     
@@ -759,18 +758,11 @@ async def get_atr_indicator(
     """
     try:
         from backend.signals.indicators import ATR
-        
+
         ticker_upper = ticker.upper()
-        
-        # Try to fetch from yfinance first
-        fetcher = get_fetcher()
-        data = fetcher.get_historical_data(ticker_upper, period=f"{lookback}d", interval=interval)
-        
-        # If yfinance fails, use mock data (for sandbox/testing)
-        if data is None or data.empty:
-            logger.warning(f"yfinance fetch failed for {ticker}, using mock data")
-            data = _generate_mock_price_data(ticker_upper, min(lookback, 100), interval=interval)
-        
+
+        data, is_simulated = _fetch_price_data(ticker_upper, lookback, interval)
+
         # Calculate ATR
         atr_calc = ATR(period=period)
         atr_values = atr_calc.calculate(data['High'], data['Low'], data['Close'])
@@ -823,6 +815,8 @@ async def get_atr_indicator(
             },
             "interpretation": f"Average True Range: {round(current_atr, 2)} ({volatility} Volatility)",
             "recent_history": recent_history,
+            "data_source": "simulated" if is_simulated else "live",
+            "last_updated": data.index[-1].isoformat() if not is_simulated else None,
             "timestamp": datetime.utcnow().isoformat(),
         }
     
@@ -864,18 +858,11 @@ async def get_bollinger_bands_indicator(
     """
     try:
         from backend.signals.indicators import BollingerBands
-        
+
         ticker_upper = ticker.upper()
-        
-        # Try to fetch from yfinance first
-        fetcher = get_fetcher()
-        data = fetcher.get_historical_data(ticker_upper, period=f"{lookback}d", interval=interval)
-        
-        # If yfinance fails, use mock data (for sandbox/testing)
-        if data is None or data.empty:
-            logger.warning(f"yfinance fetch failed for {ticker}, using mock data")
-            data = _generate_mock_price_data(ticker_upper, min(lookback, 100), interval=interval)
-        
+
+        data, is_simulated = _fetch_price_data(ticker_upper, lookback, interval)
+
         # Calculate Bollinger Bands
         bb_calc = BollingerBands(period=period, std_dev=std_dev)
         upper, middle, lower = bb_calc.calculate(data['Close'])
@@ -942,6 +929,8 @@ async def get_bollinger_bands_indicator(
             "signal": bb_signal,
             "interpretation": f"Price {position}: {bb_signal}",
             "recent_history": recent_history,
+            "data_source": "simulated" if is_simulated else "live",
+            "last_updated": data.index[-1].isoformat() if not is_simulated else None,
             "timestamp": datetime.utcnow().isoformat(),
         }
     
@@ -982,18 +971,11 @@ async def get_composite_signal(
     """
     try:
         from backend.signals.indicators import SignalGenerator
-        
+
         ticker_upper = ticker.upper()
-        
-        # Try to fetch from yfinance first
-        fetcher = get_fetcher()
-        data = fetcher.get_historical_data(ticker_upper, period=f"{lookback}d", interval=interval)
-        
-        # If yfinance fails, use mock data (for sandbox/testing)
-        if data is None or data.empty:
-            logger.warning(f"yfinance fetch failed for {ticker}, using mock data")
-            data = _generate_mock_price_data(ticker_upper, min(lookback, 100), interval=interval)
-        
+
+        data, is_simulated = _fetch_price_data(ticker_upper, lookback, interval)
+
         # Generate composite signal
         signal_gen = SignalGenerator()
         signal = signal_gen.generate_signal(data)
@@ -1051,6 +1033,8 @@ async def get_composite_signal(
                 if signal['signal'] == 'SELL'
                 else "🟡 HOLD signal - Indicators are mixed or neutral"
             ),
+            "data_source": "simulated" if is_simulated else "live",
+            "last_updated": data.index[-1].isoformat() if not is_simulated else None,
             "timestamp": datetime.utcnow().isoformat(),
         }
     
@@ -1094,17 +1078,11 @@ async def get_risk_analysis(
     """
     try:
         from backend.signals.indicators import SignalGenerator
-        
+
         ticker_upper = ticker.upper()
-        
-        # Fetch market data
-        fetcher = get_fetcher()
-        data = fetcher.get_historical_data(ticker_upper, period=f"{lookback}d", interval=interval)
-        
-        if data is None or data.empty:
-            logger.warning(f"yfinance fetch failed for {ticker}, using mock data")
-            data = _generate_mock_price_data(ticker_upper, min(lookback, 100), interval=interval)
-        
+
+        data, is_simulated = _fetch_price_data(ticker_upper, lookback, interval)
+
         if len(data) < 14:
             raise HTTPException(status_code=400, detail="Insufficient data for analysis (need min 14 periods)")
         
@@ -1159,6 +1137,8 @@ async def get_risk_analysis(
         return {
             "ticker": ticker_upper,
             "timestamp": datetime.utcnow().isoformat(),
+            "data_source": "simulated" if is_simulated else "live",
+            "last_updated": data.index[-1].isoformat() if not is_simulated else None,
             "interval": interval,
             "market_data": {
                 "current_price": round(current_price, 4),
