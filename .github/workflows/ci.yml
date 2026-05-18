@@ -8,12 +8,22 @@ on:
 jobs:
   backend-tests:
     runs-on: ubuntu-latest
-    env:
-      PYTHONPATH: ${{ github.workspace }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Detect project root
+        run: |
+          if [ -d "${GITHUB_WORKSPACE}/backend" ]; then
+            echo "PROJECT_ROOT=${GITHUB_WORKSPACE}" >> "$GITHUB_ENV"
+          elif [ -d "${GITHUB_WORKSPACE}/safeswing_trader/backend" ]; then
+            echo "PROJECT_ROOT=${GITHUB_WORKSPACE}/safeswing_trader" >> "$GITHUB_ENV"
+          else
+            echo "Could not find backend directory"
+            find "${GITHUB_WORKSPACE}" -maxdepth 3 -type d | head -200
+            exit 1
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -21,14 +31,20 @@ jobs:
           python-version: "3.12"
 
       - name: Install backend dependencies
+        env:
+          PYTHONPATH: ${{ env.PROJECT_ROOT }}
         run: |
+          cd "$PROJECT_ROOT"
           python -m pip install --upgrade pip
           pip install -r requirements-local.txt
 
       - name: Run backend tests
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-        run: pytest -q tests
+          PYTHONPATH: ${{ env.PROJECT_ROOT }}
+        run: |
+          cd "$PROJECT_ROOT"
+          python -m pytest -q tests
 
   frontend-typecheck:
     runs-on: ubuntu-latest
