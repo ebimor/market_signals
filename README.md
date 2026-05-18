@@ -109,7 +109,18 @@ npm install
 npm run dev
 ```
 
-The frontend will run on `http://localhost:3000`
+The frontend will run on `http://localhost:3001`
+
+#### 3. Run all quality checks (single command)
+
+```bash
+./scripts/check-all.sh
+```
+
+This runs:
+- Backend tests (`pytest -q tests`)
+- Frontend typecheck (`tsc --noEmit`)
+- Frontend lint (if eslint is available)
 
 ### With Docker
 
@@ -117,7 +128,7 @@ The frontend will run on `http://localhost:3000`
 docker-compose up
 ```
 
-- Frontend: `http://localhost:3000`
+- Frontend: `http://localhost:3001`
 - Backend: `http://localhost:8000`
 - PostgreSQL: `localhost:5432`
 
