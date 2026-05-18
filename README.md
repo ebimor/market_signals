@@ -54,7 +54,7 @@ safeswing_trader/
 ├── shared/               # Shared types and utilities
 ├── docs/                 # Documentation
 ├── tests/                # Test suites
-├── docker-compose.yml    # Docker orchestration
+├── launch.sh             # One-command launcher
 └── README.md
 ```
 
@@ -75,18 +75,11 @@ safeswing_trader/
 - **SQLAlchemy** - ORM
 - **SQLite/PostgreSQL** - Database
 
-### DevOps
-- **Docker** - Containerization
-- **Docker Compose** - Multi-container orchestration
-
 ## Quick Start
 
 ### Prerequisites
 - Python 3.12+
 - Node.js 18+
-- Docker & Docker Compose (optional)
-
-### Without Docker
 
 #### 1. Backend Setup
 
@@ -111,7 +104,15 @@ npm run dev
 
 The frontend will run on `http://localhost:3001`
 
-#### 3. Run all quality checks (single command)
+#### 3. One-command launch
+
+```bash
+./launch.sh
+```
+
+Starts both backend (port 8000) and frontend (port 3001).
+
+#### 4. Run all quality checks
 
 ```bash
 ./scripts/check-all.sh
@@ -121,16 +122,6 @@ This runs:
 - Backend tests (`pytest -q tests`)
 - Frontend typecheck (`tsc --noEmit`)
 - Frontend lint (if eslint is available)
-
-### With Docker
-
-```bash
-docker-compose up
-```
-
-- Frontend: `http://localhost:3001`
-- Backend: `http://localhost:8000`
-- PostgreSQL: `localhost:5432`
 
 ## API Endpoints
 

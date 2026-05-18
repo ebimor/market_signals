@@ -4,7 +4,6 @@
 
 ✅ **Backend**: Running on http://localhost:8000
 📦 **Dependencies**: Installed via virtual environment
-🐳 **Docker**: Network issues in container environment
 
 ## Quick Start (Local)
 
@@ -14,10 +13,14 @@ cd /home/eshahrivar/test_hedge_ai/safeswing_trader
 source venv/bin/activate
 ```
 
-### 2. Start Backend Server
+### 2. Launch Everything (One Command)
 ```bash
-cd backend
-python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+./launch.sh
+```
+
+Or manually start backend:
+```bash
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 **Server will be available at:**
@@ -51,7 +54,6 @@ safeswing_trader/
 │   ├── src/               # React components & pages
 │   └── package.json       # Frontend dependencies
 ├── venv/                   # Python virtual environment
-├── docker-compose.yml      # Docker orchestration (optional)
 ├── requirements-local.txt  # Simplified dependencies (no ta-lib)
 └── README.md              # Project documentation
 ```
@@ -128,17 +130,6 @@ pip install -r requirements-local.txt
 - Check network connectivity
 - Verify ticker symbols are correct
 - yfinance requires internet access
-
-## Docker (Optional)
-
-If Docker network access is restored:
-```bash
-# Build backend image
-docker-compose build --no-cache backend
-
-# Start all services
-docker-compose up
-```
 
 ## Next Steps
 
