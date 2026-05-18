@@ -7,8 +7,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List, Tuple
 import logging
-from functools import lru_cache
-import time
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +24,41 @@ class MarketDataFetcher:
         """
         self.cache_ttl_minutes = cache_ttl_minutes
         self._cache: Dict[str, Tuple[pd.DataFrame, datetime]] = {}
+        self.cache_dir = Path("backend/data/cache")
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+
+    def _cache_file_path(self, ticker: str, interval: str = "1d") -> Path:
+        safe_ticker = ticker.upper().replace("^", "IDX_")
+        return self.cache_dir / f"{safe_ticker}_{interval}.csv"
+
+    def _save_disk_cache(self, ticker: str, interval: str, data: pd.DataFrame) -> None:
+        """Persist historical data to disk as fallback when yfinance is unavailable."""
+        try:
+            path = self._cache_file_path(ticker, interval)
+            to_save = data.copy()
+            to_save.to_csv(path)
+        except Exception as e:
+            logger.warning(f"Could not save cache for {ticker} ({interval}): {e}")
+
+    def _load_disk_cache(self, ticker: str, interval: str) -> Optional[pd.DataFrame]:
+        """Load cached data from disk (if available)."""
+        path = self._cache_file_path(ticker, interval)
+        safe_ticker = ticker.upper().replace("^", "IDX_")
+        legacy_path = self.cache_dir / f"{safe_ticker}.csv"
+        candidate_paths = [path, legacy_path]
+
+        for p in candidate_paths:
+            if not p.exists():
+                continue
+            try:
+                data = pd.read_csv(p, index_col=0, parse_dates=True)
+                data.columns = [str(col).lower() for col in data.columns]
+                if not data.empty:
+                    return data
+            except Exception as e:
+                logger.warning(f"Could not load cache file {p.name} for {ticker} ({interval}): {e}")
+
+        return None
     
     def _is_cache_valid(self, cache_time: datetime) -> bool:
         """Check if cached data is still valid"""
@@ -47,6 +81,14 @@ class MarketDataFetcher:
                 return float(info["Close"].iloc[-1])
         except Exception as e:
             logger.error(f"Error fetching price for {ticker}: {e}")
+
+        # Fallback to latest close from cached historical data
+        historical = self.get_historical_data(ticker, period="1mo", interval="1d", use_cache=True)
+        if historical is not None and not historical.empty and "close" in historical.columns:
+            try:
+                return float(historical["close"].iloc[-1])
+            except Exception:
+                pass
         return None
     
     def get_historical_data(
@@ -68,6 +110,7 @@ class MarketDataFetcher:
         Returns:
             DataFrame with OHLCV data or None if failed
         """
+        ticker = ticker.upper()
         cache_key = f"{ticker}_{period}_{interval}"
         
         # Check cache
@@ -83,11 +126,17 @@ class MarketDataFetcher:
                 ticker,
                 period=period,
                 interval=interval,
-                progress=False
+                progress=False,
+                threads=False,
+                auto_adjust=False,
             )
             
             if data.empty:
-                logger.warning(f"No data returned for {ticker}")
+                logger.warning(f"No live data returned for {ticker}; trying local cache")
+                disk_data = self._load_disk_cache(ticker, interval)
+                if disk_data is not None:
+                    self._cache[cache_key] = (disk_data.copy(), datetime.now())
+                    return disk_data
                 return None
             
             # Rename columns to lowercase
@@ -95,11 +144,17 @@ class MarketDataFetcher:
             
             # Cache the data
             self._cache[cache_key] = (data.copy(), datetime.now())
+            self._save_disk_cache(ticker, interval, data)
             
             return data
             
         except Exception as e:
             logger.error(f"Error fetching historical data for {ticker}: {e}")
+            disk_data = self._load_disk_cache(ticker, interval)
+            if disk_data is not None:
+                logger.info(f"Using local historical cache for {ticker} ({interval})")
+                self._cache[cache_key] = (disk_data.copy(), datetime.now())
+                return disk_data
             return None
     
     def get_intraday_data(

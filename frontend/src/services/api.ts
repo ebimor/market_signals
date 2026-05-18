@@ -54,6 +54,22 @@ export interface MonitorItem {
   last_updated: string | null;
 }
 
+export interface HistoricalBar {
+  timestamp: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number | null;
+}
+
+export interface TickerHistory {
+  symbol: string;
+  interval: string;
+  bars: HistoricalBar[];
+  source: string;
+}
+
 export interface PerformanceStats {
   total_trades: number;
   winning_trades: number;
@@ -200,6 +216,12 @@ export const api = {
 
   async getQuote(symbol: string): Promise<TickerQuote> {
     const res = await fetch(`${API_BASE}/quote/${symbol}`);
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  async getMonitorHistory(symbol: string, interval = '1d', period = '6mo', limit = 120): Promise<TickerHistory> {
+    const res = await fetch(`${API_BASE}/monitor/history/${symbol}?interval=${interval}&period=${period}&limit=${limit}`);
     if (!res.ok) throw new Error(await res.text());
     return res.json();
   }

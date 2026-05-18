@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { api, MonitorItem } from '../services/api';
+import { api, HistoricalBar, MonitorItem } from '../services/api';
 import '../styles/TickerMonitor.css';
 
 export const TickerMonitor: React.FC = () => {
@@ -9,6 +9,7 @@ export const TickerMonitor: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
+  const [history, setHistory] = useState<HistoricalBar[]>([]);
 
   const loadAll = async (options?: { silent?: boolean }) => {
     const silent = options?.silent ?? false;
@@ -38,6 +39,24 @@ export const TickerMonitor: React.FC = () => {
     () => items.find(i => i.symbol === hovered) || items[0] || null,
     [items, hovered]
   );
+
+  useEffect(() => {
+    if (!selected?.symbol) {
+      setHistory([]);
+      return;
+    }
+
+    let canceled = false;
+    api.getMonitorHistory(selected.symbol, '1d', '6mo', 30)
+      .then((resp) => {
+        if (!canceled) setHistory(resp.bars ?? []);
+      })
+      .catch(() => {
+        if (!canceled) setHistory([]);
+      });
+
+    return () => { canceled = true; };
+  }, [selected?.symbol]);
 
   const handleSave = async () => {
     const tickers = tickersInput
@@ -110,6 +129,22 @@ export const TickerMonitor: React.FC = () => {
           {selected.last_updated && (
             <div className="detail-line"><span>Latest Update:</span> {new Date(selected.last_updated).toLocaleString()}</div>
           )}
+
+          <div className="history-block">
+            <div className="history-title">Recent Historical Closes</div>
+            {history.length === 0 ? (
+              <div className="history-empty">No historical bars available.</div>
+            ) : (
+              <div className="history-list">
+                {history.slice(-10).reverse().map((bar) => (
+                  <div key={bar.timestamp} className="history-row">
+                    <span>{new Date(bar.timestamp).toLocaleDateString()}</span>
+                    <strong>${bar.close.toFixed(2)}</strong>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

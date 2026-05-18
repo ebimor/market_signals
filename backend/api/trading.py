@@ -165,6 +165,24 @@ class TickerMonitorItem(BaseModel):
     last_updated: Optional[str]
 
 
+class HistoricalBar(BaseModel):
+    """Single historical OHLCV bar"""
+    timestamp: str
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: Optional[float]
+
+
+class TickerHistoryResponse(BaseModel):
+    """Historical data for a ticker"""
+    symbol: str
+    interval: str
+    bars: List[HistoricalBar]
+    source: str
+
+
 def _normalize_ohlcv_columns(data: pd.DataFrame) -> pd.DataFrame:
     """Normalize OHLCV column names to title case for indicator engines."""
     renamed = data.copy()
@@ -376,6 +394,44 @@ def get_monitor_overview():
         })
 
     return overview
+
+
+@router.get("/monitor/history/{symbol}", response_model=TickerHistoryResponse)
+def get_monitor_history(
+    symbol: str,
+    interval: str = "1d",
+    period: str = "6mo",
+    limit: int = 120
+):
+    """Get historical bars for a monitored ticker (live or local cache fallback)."""
+    ticker = symbol.upper()
+    data = get_fetcher().get_historical_data(ticker, period=period, interval=interval, use_cache=True)
+    if data is None or data.empty:
+        raise HTTPException(status_code=404, detail=f"No historical data available for {ticker}")
+
+    normalized = _normalize_ohlcv_columns(data)
+    required = ["Open", "High", "Low", "Close"]
+    if not all(col in normalized.columns for col in required):
+        raise HTTPException(status_code=500, detail=f"Historical data for {ticker} missing OHLC fields")
+
+    trimmed = normalized.tail(max(1, min(limit, 500)))
+    bars = []
+    for idx, row in trimmed.iterrows():
+        bars.append({
+            "timestamp": idx.isoformat(),
+            "open": float(row["Open"]),
+            "high": float(row["High"]),
+            "low": float(row["Low"]),
+            "close": float(row["Close"]),
+            "volume": float(row["Volume"]) if "Volume" in normalized.columns and pd.notna(row.get("Volume")) else None,
+        })
+
+    return {
+        "symbol": ticker,
+        "interval": interval,
+        "bars": bars,
+        "source": "live_or_cache",
+    }
 
 
 # ============================================================================
