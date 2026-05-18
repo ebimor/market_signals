@@ -102,6 +102,7 @@ class TradeManager:
         os.makedirs(os.path.dirname(records_file), exist_ok=True)
         
         self.initial_cash = 100000.0
+        self.monitored_tickers: List[str] = ["AAPL", "MSFT", "TSLA"]
         self.pending_signals: List[TradeSignal] = []
         self.pending_approvals: Dict[str, TradeApproval] = {}
         self.executed_trades: List[ExecutedTrade] = []
@@ -407,6 +408,26 @@ class TradeManager:
             'total_exposure': total_exposure,
             'current_cash': current_cash
         }
+
+    def get_monitored_tickers(self) -> List[str]:
+        """Get the configured list of user-monitored tickers."""
+        return list(self.monitored_tickers)
+
+    def set_monitored_tickers(self, tickers: List[str], save: bool = True) -> List[str]:
+        """Replace monitored tickers with a normalized, de-duplicated list."""
+        normalized: List[str] = []
+        seen = set()
+        for ticker in tickers:
+            t = str(ticker).strip().upper()
+            if not t or t in seen:
+                continue
+            seen.add(t)
+            normalized.append(t)
+
+        self.monitored_tickers = normalized
+        if save:
+            self._save_records()
+        return self.get_monitored_tickers()
     
     # ========================================================================
     # Persistence
@@ -415,6 +436,7 @@ class TradeManager:
     def _save_records(self) -> None:
         """Save records to JSON file"""
         records = {
+            'monitored_tickers': self.monitored_tickers,
             'executed_trades': [asdict(t) for t in self.executed_trades],
             'saved_at': datetime.now().isoformat()
         }
@@ -430,6 +452,9 @@ class TradeManager:
             try:
                 with open(self.records_file, 'r') as f:
                     records = json.load(f)
+
+                    if 'monitored_tickers' in records and isinstance(records['monitored_tickers'], list):
+                        self.set_monitored_tickers(records['monitored_tickers'], save=False)
                     
                     # Load pending signals
                     if 'pending_signals' in records:

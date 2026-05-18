@@ -10,8 +10,9 @@ export function useTrading() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const refreshAll = async () => {
-    setLoading(true);
+  const refreshAll = async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const [s, o, h, st, st2] = await Promise.all([
@@ -29,14 +30,14 @@ export function useTrading() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
     refreshAll();
     // Poll every 5 seconds
-    const interval = setInterval(refreshAll, 5000);
+    const interval = setInterval(() => refreshAll({ silent: true }), 5000);
     return () => clearInterval(interval);
   }, []);
 

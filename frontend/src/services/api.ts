@@ -32,6 +32,28 @@ export interface Trade {
   notes?: string;
 }
 
+export interface TickerQuote {
+  symbol: string;
+  price: number | null;
+  source: 'live' | 'latest_close' | 'latest' | 'unavailable';
+  market_open: boolean;
+  message: string;
+  last_updated: string | null;
+}
+
+export interface MonitorItem {
+  symbol: string;
+  signal: 'BUY' | 'SELL' | 'HOLD';
+  confidence: number;
+  condition: string;
+  action: string;
+  price: number | null;
+  price_source: 'live' | 'latest_close' | 'latest' | 'unavailable';
+  market_open: boolean;
+  price_message: string;
+  last_updated: string | null;
+}
+
 export interface PerformanceStats {
   total_trades: number;
   winning_trades: number;
@@ -151,6 +173,34 @@ export const api = {
 
   async getDashboard(): Promise<any> {
     const res = await fetch(`${API_BASE}/dashboard`);
+    return res.json();
+  },
+
+  async getMonitoredTickers(): Promise<string[]> {
+    const res = await fetch(`${API_BASE}/monitor/tickers`);
+    const data = await res.json();
+    return data.tickers ?? [];
+  },
+
+  async setMonitoredTickers(tickers: string[]): Promise<string[]> {
+    const res = await fetch(`${API_BASE}/monitor/tickers`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tickers })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    return data.tickers ?? [];
+  },
+
+  async getMonitorOverview(): Promise<MonitorItem[]> {
+    const res = await fetch(`${API_BASE}/monitor/overview`);
+    return res.json();
+  },
+
+  async getQuote(symbol: string): Promise<TickerQuote> {
+    const res = await fetch(`${API_BASE}/quote/${symbol}`);
+    if (!res.ok) throw new Error(await res.text());
     return res.json();
   }
 };

@@ -95,6 +95,33 @@
   box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
 }
 
+.price-status-badge {
+  margin-top: 0.35rem;
+  display: inline-block;
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.price-status-badge.live {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
+}
+
+.price-status-badge.closed {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.price-status-badge.fallback {
+  background: #e5e7eb;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
 .form-textarea {
   resize: vertical;
   min-height: 60px;

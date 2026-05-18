@@ -7,12 +7,13 @@ import { OpenPositions } from './components/OpenPositions'
 import { SystemStatusComponent as SystemStatus } from './components/SystemStatus'
 import { SignalAnalysis } from './components/SignalAnalysis'
 import { ManualTrade } from './components/ManualTrade'
+import { TickerMonitor } from './components/TickerMonitor'
 import './index.css'
 
-type Tab = 'signals' | 'analysis' | 'manual' | 'history' | 'performance' | 'positions'
+type Tab = 'monitor' | 'signals' | 'analysis' | 'manual' | 'history' | 'performance' | 'positions'
 
 function App() {
-  const [activeTab, setActiveTab] = useState<Tab>('signals')
+  const [activeTab, setActiveTab] = useState<Tab>('monitor')
   const {
     signals, openTrades, tradeHistory, stats, status,
     loading, error, approveTrade, rejectTrade, refreshAll
@@ -28,6 +29,9 @@ function App() {
       {error && <div className="error-banner">⚠️ {error}</div>}
 
       <nav className="tab-nav">
+        <button className={activeTab === 'monitor' ? 'active' : ''} onClick={() => setActiveTab('monitor')}>
+          🎯 Monitor
+        </button>
         <button className={activeTab === 'signals' ? 'active' : ''} onClick={() => setActiveTab('signals')}>
           Signals {signals.length > 0 && <span className="badge">{signals.length}</span>}
         </button>
@@ -50,6 +54,10 @@ function App() {
 
       <main className="app-main">
         {loading && <div className="loading">Loading...</div>}
+
+        {activeTab === 'monitor' && (
+          <TickerMonitor />
+        )}
 
         {activeTab === 'signals' && (
           <SignalReview signals={signals} onApprove={approveTrade} onReject={rejectTrade} loading={loading} />

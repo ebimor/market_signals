@@ -1,5 +1,5 @@
-import React from 'react';
-import { SystemStatus, Trade } from '../services/api';
+import React, { useEffect, useState } from 'react';
+import { api, SystemStatus, TickerQuote, Trade } from '../services/api';
 import '../styles/OpenPositions.css';
 
 interface OpenPositionsProps {
@@ -8,6 +8,40 @@ interface OpenPositionsProps {
 }
 
 export const OpenPositions: React.FC<OpenPositionsProps> = ({ trades, status: _status }) => {
+  const [quotes, setQuotes] = useState<Record<string, TickerQuote>>({});
+
+  useEffect(() => {
+    const symbols = Array.from(new Set(trades.map(t => t.symbol)));
+    if (!symbols.length) {
+      setQuotes({});
+      return;
+    }
+
+    let canceled = false;
+    Promise.all(
+      symbols.map(async (symbol) => {
+        try {
+          const quote = await api.getQuote(symbol);
+          return [symbol, quote] as const;
+        } catch {
+          return [symbol, {
+            symbol,
+            price: null,
+            source: 'unavailable' as const,
+            market_open: false,
+            message: 'Price unavailable',
+            last_updated: null,
+          }] as const;
+        }
+      })
+    ).then((pairs) => {
+      if (canceled) return;
+      setQuotes(Object.fromEntries(pairs));
+    });
+
+    return () => { canceled = true; };
+  }, [trades]);
+
   if (trades.length === 0) {
     return (
       <div className="open-positions">
@@ -27,6 +61,12 @@ export const OpenPositions: React.FC<OpenPositionsProps> = ({ trades, status: _s
               <h3>{trade.symbol}</h3>
               <span className="position-size">{trade.position_size} shares</span>
             </div>
+            {quotes[trade.symbol] && (
+              <div className={`position-price-badge ${quotes[trade.symbol].source === 'live' ? 'live' : quotes[trade.symbol].source === 'latest_close' ? 'closed' : 'fallback'}`}>
+                {quotes[trade.symbol].price !== null ? `$${quotes[trade.symbol].price!.toFixed(2)} · ` : ''}
+                {quotes[trade.symbol].source === 'live' ? 'Live price' : quotes[trade.symbol].message}
+              </div>
+            )}
             <div className="position-details">
               <div className="detail">
                 <label>Entry:</label>
@@ -34,16 +74,20 @@ export const OpenPositions: React.FC<OpenPositionsProps> = ({ trades, status: _s
               </div>
               <div className="detail">
                 <label>SL:</label>
-                <span>${trade.stop_loss.toFixed(2)}</span>
+                <span>{typeof trade.stop_loss === 'number' ? `$${trade.stop_loss.toFixed(2)}` : '—'}</span>
               </div>
               <div className="detail">
                 <label>TP:</label>
-                <span>${trade.take_profit.toFixed(2)}</span>
+                <span>{typeof trade.take_profit === 'number' ? `$${trade.take_profit.toFixed(2)}` : '—'}</span>
               </div>
             </div>
             <div className="progress-bars">
-              <div className="progress-label">Distance to TP: ${(trade.take_profit - trade.entry_price).toFixed(2)}</div>
-              <div className="progress-label">Distance to SL: ${(trade.entry_price - trade.stop_loss).toFixed(2)}</div>
+              <div className="progress-label">
+                Distance to TP: {typeof trade.take_profit === 'number' ? `$${(trade.take_profit - trade.entry_price).toFixed(2)}` : 'N/A'}
+              </div>
+              <div className="progress-label">
+                Distance to SL: {typeof trade.stop_loss === 'number' ? `$${(trade.entry_price - trade.stop_loss).toFixed(2)}` : 'N/A'}
+              </div>
             </div>
           </div>
         ))}

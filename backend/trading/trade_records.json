@@ -1,4 +1,10 @@
 {
+  "monitored_tickers": [
+    "AAPL",
+    "MSFT",
+    "TSLA",
+    "ZQQ"
+  ],
   "executed_trades": [
     {
       "trade_id": "trade_001",
@@ -152,7 +158,24 @@
       "pnl": 100000.0,
       "pnl_percent": 100.0,
       "notes": "Manual entry"
+    },
+    {
+      "trade_id": "MAN_NVDA_20260518_180339_300024",
+      "symbol": "NVDA",
+      "signal_id": "manual_MAN_NVDA_20260518_180339_300024",
+      "entry_price": 110.0,
+      "entry_date": "2026-05-18 18:03:39.300053",
+      "position_size": 100.0,
+      "stop_loss": null,
+      "take_profit": null,
+      "status": "executed",
+      "exit_price": null,
+      "exit_date": null,
+      "exit_reason": null,
+      "pnl": null,
+      "pnl_percent": null,
+      "notes": "Manual entry"
     }
   ],
-  "saved_at": "2026-05-18T15:32:37.438135"
+  "saved_at": "2026-05-18T18:08:20.619300"
 }

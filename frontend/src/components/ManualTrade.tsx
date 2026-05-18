@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { api, Trade, PerformanceStats } from '../services/api';
+import React, { useEffect, useState } from 'react';
+import { api, Trade, PerformanceStats, TickerQuote } from '../services/api';
 import '../styles/ManualTrade.css';
 
 interface ManualTradeProps {
@@ -36,6 +36,7 @@ const emptyOpen: OpenForm = {
 export const ManualTrade: React.FC<ManualTradeProps> = ({ openTrades, stats, onTradeAdded }) => {
   const [openForm, setOpenForm] = useState<OpenForm>(emptyOpen);
   const [closeForms, setCloseForms] = useState<Record<string, CloseForm>>({});
+  const [quote, setQuote] = useState<TickerQuote | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [closingId, setClosingId] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState('');
@@ -50,6 +51,25 @@ export const ManualTrade: React.FC<ManualTradeProps> = ({ openTrades, stats, onT
   const handleOpenChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setOpenForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
+
+  useEffect(() => {
+    const symbol = openForm.symbol.trim().toUpperCase();
+    if (!symbol) {
+      setQuote(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const q = await api.getQuote(symbol);
+        setQuote(q);
+      } catch {
+        setQuote(null);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [openForm.symbol]);
 
   const handleOpenSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -160,6 +180,12 @@ export const ManualTrade: React.FC<ManualTradeProps> = ({ openTrades, stats, onT
                 placeholder="e.g. AAPL"
                 className="form-input"
               />
+              {quote && (
+                <div className={`price-status-badge ${quote.source === 'live' ? 'live' : quote.source === 'latest_close' ? 'closed' : 'fallback'}`}>
+                  {quote.price !== null ? `$${quote.price.toFixed(2)} · ` : ''}
+                  {quote.source === 'live' ? 'Live price' : quote.message}
+                </div>
+              )}
             </div>
             <div className="form-group">
               <label>Direction *</label>
