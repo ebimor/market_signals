@@ -111,6 +111,19 @@
   line-height: 1.5;
 }
 
+.signal-analysis-list {
+  margin: 0.5rem 0 0 1rem;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.signal-analysis-list li {
+  color: #4b5563;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
 .modifications {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -209,4 +222,55 @@
   .signal-actions .btn {
     flex: 1;
   }
+}
+
+/* Readability overrides for dark card backgrounds */
+.signal-review .signal-card {
+  background: #1a1d2e;
+  border-color: #2d3748;
+}
+
+.signal-review .signal-header {
+  border-bottom-color: #2d3748;
+}
+
+.signal-review .signal-header h3 {
+  color: #f8fafc;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.signal-review .detail-row label {
+  color: #94a3b8;
+}
+
+.signal-review .detail-row span {
+  color: #e2e8f0;
+}
+
+.signal-review .signal-reason {
+  background: #0f172a;
+  border-left-color: #3b82f6;
+}
+
+.signal-review .signal-reason small {
+  color: #cbd5e1;
+}
+
+.signal-review .signal-analysis-list li {
+  color: #cbd5e1;
+}
+
+.signal-review .modifications {
+  background: #111827;
+}
+
+.signal-review .modifications label {
+  color: #94a3b8;
+}
+
+.signal-review .modifications input {
+  background: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
 }

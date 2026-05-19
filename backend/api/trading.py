@@ -14,19 +14,22 @@ REST Endpoints for trading operations:
 """
 
 from fastapi import APIRouter, HTTPException, Body
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import pandas as pd
+from backend.config import settings
 from backend.trading.trade_manager import TradeManager, SignalType
 from backend.market_data.data_fetcher import get_fetcher
-from backend.signals.indicators import SignalGenerator
+from backend.signals.indicators import SignalGenerator, RSI
 
 router = APIRouter(prefix="/api/trading", tags=["Trading"])
 
 # Global trade manager instance
 trade_manager = TradeManager()
+
+AUTO_SIGNAL_PREFIX = "Auto-generated from Monitor:"
 
 
 # ============================================================================
@@ -146,6 +149,7 @@ class TickerQuoteResponse(BaseModel):
     symbol: str
     price: Optional[float]
     source: str
+    data_provider: str
     market_open: bool
     message: str
     last_updated: Optional[str]
@@ -160,9 +164,11 @@ class TickerMonitorItem(BaseModel):
     action: str
     price: Optional[float]
     price_source: str
+    data_provider: str
     market_open: bool
     price_message: str
     last_updated: Optional[str]
+    signal_metrics: List[dict] = Field(default_factory=list)
 
 
 class HistoricalBar(BaseModel):
@@ -197,6 +203,40 @@ def _normalize_ohlcv_columns(data: pd.DataFrame) -> pd.DataFrame:
     return renamed
 
 
+def _calculate_rsi_timeframe(
+    fetcher,
+    ticker: str,
+    period: str,
+    interval: str,
+    resample_rule: Optional[str] = None,
+) -> Optional[float]:
+    """Calculate RSI(14) for a specific timeframe."""
+    data = fetcher.get_historical_data(ticker, period=period, interval=interval, use_cache=True)
+    if data is None or data.empty:
+        return None
+
+    normalized = _normalize_ohlcv_columns(data)
+    if "Close" not in normalized.columns:
+        return None
+
+    close = normalized["Close"].copy()
+    close.index = pd.to_datetime(close.index, utc=True)
+    close = close.sort_index()
+
+    if resample_rule:
+        close = close.resample(resample_rule).last().dropna()
+
+    if len(close) < 15:
+        return None
+
+    rsi_values = RSI(period=14).calculate(close)
+    rsi_values = rsi_values.dropna()
+    if rsi_values.empty:
+        return None
+
+    return float(round(float(rsi_values.iloc[-1]), 2))
+
+
 def _is_regular_us_session_open() -> bool:
     """Best-effort market open check for NYSE/Nasdaq regular session."""
     now_et = datetime.now(ZoneInfo("America/New_York"))
@@ -212,6 +252,7 @@ def _build_quote(symbol: str) -> dict:
     fetcher = get_fetcher()
 
     market_open = _is_regular_us_session_open()
+    provider_mode = str(getattr(settings, "market_data_provider", "questrade") or "questrade").lower()
     
     # Try to get live Questrade data with timestamp
     live_quote = fetcher.get_price_with_timestamp(ticker)
@@ -220,6 +261,7 @@ def _build_quote(symbol: str) -> dict:
             "symbol": ticker,
             "price": float(live_quote["price"]),
             "source": "live",
+            "data_provider": str(live_quote.get("provider") or "questrade"),
             "market_open": True,
             "message": "Live intraday price",
             "last_updated": live_quote.get("timestamp"),
@@ -243,6 +285,7 @@ def _build_quote(symbol: str) -> dict:
             "symbol": ticker,
             "price": float(current_price),
             "source": "live",
+            "data_provider": "yahoo" if provider_mode == "yahoo" else provider_mode,
             "market_open": True,
             "message": "Live intraday price",
             "last_updated": datetime.utcnow().isoformat(),
@@ -253,6 +296,7 @@ def _build_quote(symbol: str) -> dict:
             "symbol": ticker,
             "price": latest_close,
             "source": "latest_close",
+            "data_provider": "yahoo" if provider_mode == "yahoo" else provider_mode,
             "market_open": market_open,
             "message": "Market closed — showing latest close" if not market_open else "Using latest available close",
             "last_updated": last_updated,
@@ -263,6 +307,7 @@ def _build_quote(symbol: str) -> dict:
             "symbol": ticker,
             "price": float(current_price),
             "source": "latest",
+            "data_provider": "yahoo" if provider_mode == "yahoo" else provider_mode,
             "market_open": market_open,
             "message": "Using latest available price",
             "last_updated": None,
@@ -272,6 +317,7 @@ def _build_quote(symbol: str) -> dict:
         "symbol": ticker,
         "price": None,
         "source": "unavailable",
+        "data_provider": "none",
         "market_open": market_open,
         "message": "Price data unavailable",
         "last_updated": None,
@@ -291,6 +337,99 @@ def _condition_and_action(signal: str, confidence: float) -> tuple[str, str]:
     return "Mixed / neutral", "Hold and wait"
 
 
+def _build_auto_signal_reason(item: dict) -> str:
+    """Build a concise analysis reason for monitor-derived signals."""
+    symbol = str(item.get("symbol") or "").upper()
+    condition = str(item.get("condition") or "Composite signal triggered")
+    confidence = float(item.get("confidence") or 0.0)
+    metrics = item.get("signal_metrics") or []
+
+    rsi_daily = None
+    macd_hist = None
+    for metric in metrics:
+        name = str(metric.get("name") or "")
+        if name == "RSI (Daily)":
+            rsi_daily = metric.get("current")
+        elif name == "MACD Histogram":
+            macd_hist = metric.get("current")
+
+    parts = [f"{AUTO_SIGNAL_PREFIX} {symbol} {condition} ({confidence:.0f}% confidence)"]
+    if rsi_daily is not None:
+        parts.append(f"RSI={float(rsi_daily):.1f}")
+    if macd_hist is not None:
+        parts.append(f"MACD_hist={float(macd_hist):.4f}")
+    parts.append("Composite RSI/MACD monitor trigger.")
+    return " | ".join(parts)
+
+
+def _build_risk_levels(signal_type: str, price: float) -> tuple[float, float]:
+    """Generate default SL/TP for monitor-derived signals."""
+    if signal_type == "BUY":
+        return round(price * 0.98, 2), round(price * 1.04, 2)
+    return round(price * 1.02, 2), round(price * 0.96, 2)
+
+
+def _sync_pending_signals_from_monitor(overview: List[dict]) -> None:
+    """Ensure BUY/SELL monitor statuses are represented as pending signals."""
+    allowed = set(trade_manager.get_monitored_tickers())
+    if not allowed:
+        return
+
+    desired: dict[str, dict] = {}
+    for item in overview:
+        symbol = str(item.get("symbol") or "").upper()
+        signal = str(item.get("signal") or "HOLD").upper()
+        price = item.get("price")
+        if symbol in allowed and signal in {"BUY", "SELL"} and price is not None:
+            desired[symbol] = item
+
+    # Remove stale/invalid auto-generated monitor signals.
+    for existing in list(trade_manager.pending_signals):
+        if existing.symbol not in allowed:
+            continue
+        if not str(existing.reason or "").startswith(AUTO_SIGNAL_PREFIX):
+            continue
+        current = desired.get(existing.symbol)
+        if current is None or existing.signal_type.value != str(current.get("signal", "")).upper():
+            trade_manager.pending_signals.remove(existing)
+
+    auto_by_symbol = {
+        s.symbol: s
+        for s in trade_manager.pending_signals
+        if s.symbol in allowed and str(s.reason or "").startswith(AUTO_SIGNAL_PREFIX)
+    }
+
+    for symbol, item in desired.items():
+        signal_type = str(item.get("signal") or "BUY").upper()
+        price = float(item.get("price") or 0.0)
+        confidence = max(0.0, min(100.0, float(item.get("confidence") or 0.0)))
+        reason = _build_auto_signal_reason(item)
+        stop_loss, take_profit = _build_risk_levels(signal_type, price)
+
+        existing = auto_by_symbol.get(symbol)
+        if existing:
+            existing.price = price
+            existing.confidence = confidence
+            existing.reason = reason
+            existing.generated_at = datetime.now()
+            existing.position_size = 100
+            existing.stop_loss = stop_loss
+            existing.take_profit = take_profit
+            continue
+
+        trade_manager.add_signal(
+            symbol=symbol,
+            signal_type=SignalType(signal_type),
+            price=price,
+            confidence=confidence,
+            reason=reason,
+            position_size=100,
+            stop_loss=stop_loss,
+            take_profit=take_profit,
+            atr=None,
+        )
+
+
 # ============================================================================
 # Signal Endpoints
 # ============================================================================
@@ -302,6 +441,10 @@ def get_pending_signals():
     
     Returns list of signals with details (price, confidence, reason, etc.)
     """
+    # Sync monitor BUY/SELL statuses into pending signals so review/analysis are populated.
+    overview = get_monitor_overview()
+    _sync_pending_signals_from_monitor(overview)
+
     signals = trade_manager.get_pending_signals()
     allowed = set(trade_manager.get_monitored_tickers())
     if not allowed:
@@ -384,6 +527,16 @@ def get_monitor_overview():
         confidence = 0.0
         condition = "Data unavailable"
         action = "Wait for data"
+        signal_metrics: List[dict] = []
+        has_quote_price = quote.get("price") is not None
+
+        if has_quote_price:
+            if quote.get("source") == "live":
+                condition = "Live price available"
+                action = "Monitoring with live quote (waiting for full indicator dataset)"
+            else:
+                condition = "Price available"
+                action = "Monitoring with latest available price (indicator data limited)"
 
         data = fetcher.get_historical_data(ticker, period="3mo", interval="1d", use_cache=True)
         if data is not None and not data.empty:
@@ -394,6 +547,96 @@ def get_monitor_overview():
                 confidence = float(signal_data.get("confidence", 0.0))
                 condition, action = _condition_and_action(signal, confidence)
 
+                components = signal_data.get("components", {}) or {}
+                rsi_value = (components.get("rsi", {}) or {}).get("value")
+                macd_hist = (components.get("macd", {}) or {}).get("value")
+                ema_value = (components.get("ema", {}) or {}).get("value")
+                bb_position = (components.get("bb", {}) or {}).get("value")
+                current_close = float(normalized["Close"].iloc[-1]) if not normalized.empty else None
+
+                rsi_4h = _calculate_rsi_timeframe(
+                    fetcher,
+                    ticker,
+                    period="1mo",
+                    interval="60m",
+                    resample_rule="4h",
+                )
+                rsi_daily = _calculate_rsi_timeframe(
+                    fetcher,
+                    ticker,
+                    period="3mo",
+                    interval="1d",
+                )
+                rsi_weekly = _calculate_rsi_timeframe(
+                    fetcher,
+                    ticker,
+                    period="2y",
+                    interval="1wk",
+                )
+
+                ema_diff_pct = None
+                if current_close is not None and ema_value not in (None, 0):
+                    ema_diff_pct = round(((current_close - float(ema_value)) / float(ema_value)) * 100, 2)
+
+                signal_metrics = [
+                    {
+                        "name": "RSI (4H)",
+                        "current": rsi_4h,
+                        "low_trigger": 30.0,
+                        "high_trigger": 70.0,
+                        "unit": "index",
+                        "description": "BUY below 30, SELL above 70",
+                    },
+                    {
+                        "name": "RSI (Daily)",
+                        "current": rsi_daily if rsi_daily is not None else rsi_value,
+                        "low_trigger": 30.0,
+                        "high_trigger": 70.0,
+                        "unit": "index",
+                        "description": "BUY below 30, SELL above 70",
+                    },
+                    {
+                        "name": "RSI (Weekly)",
+                        "current": rsi_weekly,
+                        "low_trigger": 30.0,
+                        "high_trigger": 70.0,
+                        "unit": "index",
+                        "description": "BUY below 30, SELL above 70",
+                    },
+                    {
+                        "name": "RSI (Model)",
+                        "current": rsi_value,
+                        "low_trigger": 30.0,
+                        "high_trigger": 70.0,
+                        "unit": "index",
+                        "description": "RSI used by current composite signal",
+                    },
+                    {
+                        "name": "MACD Histogram",
+                        "current": macd_hist,
+                        "low_trigger": -0.0001,
+                        "high_trigger": 0.0001,
+                        "unit": "value",
+                        "description": "BUY above 0, SELL below 0",
+                    },
+                    {
+                        "name": "EMA Distance",
+                        "current": ema_diff_pct,
+                        "low_trigger": -2.0,
+                        "high_trigger": 2.0,
+                        "unit": "%",
+                        "description": "BUY above +2%, SELL below -2%",
+                    },
+                    {
+                        "name": "Bollinger Position",
+                        "current": bb_position,
+                        "low_trigger": 20.0,
+                        "high_trigger": 80.0,
+                        "unit": "%",
+                        "description": "BUY below 20%, SELL above 80%",
+                    },
+                ]
+
         overview.append({
             "symbol": ticker,
             "signal": signal,
@@ -402,9 +645,11 @@ def get_monitor_overview():
             "action": action,
             "price": quote["price"],
             "price_source": quote["source"],
+            "data_provider": quote["data_provider"],
             "market_open": quote["market_open"],
             "price_message": quote["message"],
             "last_updated": quote["last_updated"],
+            "signal_metrics": signal_metrics,
         })
 
     return overview

@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     
     # Market Data
     market_data_refresh_interval: int = 60  # seconds
+    market_data_provider: str = "questrade"  # questrade | yahoo | auto
     
     # Risk Management
     default_account_risk_percent: float = 0.01  # 1%

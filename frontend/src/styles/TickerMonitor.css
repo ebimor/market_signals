@@ -10,6 +10,17 @@
   color: #111827;
 }
 
+.ticker-monitor-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.ticker-monitor-head-left {
+  min-width: 0;
+}
+
 .ticker-monitor-head p {
   margin: 0.25rem 0 1rem;
   color: #6b7280;
@@ -19,7 +30,105 @@
 .ticker-config-row {
   display: flex;
   gap: 0.6rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
+  align-items: center;
+}
+
+.ticker-options-btn {
+  border: none;
+  border-radius: 6px;
+  padding: 0.45rem 0.75rem;
+  background: #111827;
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ticker-options-btn:hover {
+  background: #1f2937;
+}
+
+.ticker-options-panel {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 0.75rem;
+  margin-bottom: 0.9rem;
+}
+
+.ticker-options-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #374151;
+  margin-bottom: 0.45rem;
+}
+
+.ticker-options-actions {
+  margin-top: 0.5rem;
+}
+
+.monitored-list {
+  flex: 1;
+  min-height: 40px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 0.35rem 0.45rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  background: #f9fafb;
+}
+
+.ticker-chip {
+  background: #e5e7eb;
+  color: #111827;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.ticker-edit-btn {
+  border: none;
+  border-radius: 6px;
+  padding: 0.6rem 0.9rem;
+  background: #374151;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ticker-edit-btn:hover {
+  background: #1f2937;
+}
+
+.ticker-cancel-btn {
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 0.55rem 0.9rem;
+  background: #ffffff;
+  color: #374151;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ticker-cancel-btn:hover:not(:disabled) {
+  background: #f9fafb;
+}
+
+.ticker-list-meta {
+  font-size: 0.82rem;
+  color: #6b7280;
+  margin: -0.45rem 0 0.7rem;
+}
+
+.ticker-editing-note {
+  font-size: 0.82rem;
+  color: #1d4ed8;
+  margin: -0.45rem 0 0.7rem;
 }
 
 .ticker-input {
@@ -79,11 +188,44 @@
   margin-bottom: 0.8rem;
 }
 
+.ticker-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+.ticker-sort-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.55rem;
+}
+
+.ticker-sort-row label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #374151;
+  white-space: nowrap;
+}
+
+.ticker-sort-select {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 0.38rem 0.5rem;
+  background: #ffffff;
+  color: #111827;
+  font-size: 0.8rem;
+}
+
 .ticker-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 0.75rem;
-  margin-bottom: 1rem;
+  grid-template-columns: 1fr;
+  gap: 0.65rem;
+  max-height: 75vh;
+  overflow: auto;
+  padding-right: 0.2rem;
 }
 
 .ticker-card {
@@ -92,6 +234,13 @@
   border-radius: 8px;
   padding: 0.75rem;
   background: #f9fafb;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.ticker-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
 .ticker-card.active { box-shadow: 0 0 0 2px rgba(59,130,246,0.2); }
@@ -148,6 +297,12 @@
   margin-top: 0.2rem;
 }
 
+.ticker-source {
+  font-size: 0.78rem;
+  color: #4b5563;
+  margin-top: 0.2rem;
+}
+
 .ticker-card-refresh {
   margin-top: 0.4rem;
   width: 100%;
@@ -174,6 +329,7 @@
   border-radius: 8px;
   background: #ffffff;
   padding: 0.9rem;
+  min-height: 320px;
 }
 
 .ticker-detail-panel h3 {
@@ -224,4 +380,84 @@
   border: 1px solid #e5e7eb;
   border-radius: 4px;
   padding: 0.25rem 0.45rem;
+}
+
+@media (max-width: 1000px) {
+  .ticker-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .ticker-cards {
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+.metrics-block {
+  margin-top: 0.9rem;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 0.75rem;
+}
+
+.metrics-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #374151;
+  margin-bottom: 0.45rem;
+}
+
+.metrics-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.metric-row {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #f9fafb;
+  padding: 0.45rem 0.55rem;
+}
+
+.metric-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.metric-status {
+  margin-right: 0.2rem;
+}
+
+.metric-values {
+  display: grid;
+  gap: 0.15rem;
+  font-size: 0.78rem;
+  color: #374151;
+  margin-top: 0.2rem;
+}
+
+.metric-desc {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-top: 0.2rem;
+}
+
+.metric-timeframes {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+  font-size: 0.78rem;
+}
+
+.metric-timeframe {
+  padding: 0.15rem 0;
+  color: #374151;
+}
+
+.metric-timeframe.met {
+  color: #065f46;
+}
+
+.metric-timeframe.not-met {
+  color: #991b1b;
 }

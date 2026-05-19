@@ -36,6 +36,7 @@ export interface TickerQuote {
   symbol: string;
   price: number | null;
   source: 'live' | 'latest_close' | 'latest' | 'unavailable';
+  data_provider: string;
   market_open: boolean;
   message: string;
   last_updated: string | null;
@@ -49,9 +50,20 @@ export interface MonitorItem {
   action: string;
   price: number | null;
   price_source: 'live' | 'latest_close' | 'latest' | 'unavailable';
+  data_provider: string;
   market_open: boolean;
   price_message: string;
   last_updated: string | null;
+  signal_metrics: SignalMetric[];
+}
+
+export interface SignalMetric {
+  name: string;
+  current: number | null;
+  low_trigger: number;
+  high_trigger: number;
+  unit: string;
+  description: string;
 }
 
 export interface HistoricalBar {

@@ -1,8 +1,16 @@
 {
   "monitored_tickers": [
-    "ZQQ",
+    "ZQQ.TO",
     "AAPL",
-    "TSLA"
+    "TSLA",
+    "ZUE.TO",
+    "NVDA",
+    "GOOG",
+    "MSFT",
+    "META",
+    "AMZN",
+    "VISA",
+    "MA"
   ],
   "executed_trades": [
     {
@@ -89,7 +97,24 @@
       "pnl": 100.0,
       "pnl_percent": 0.5952380952380952,
       "notes": "Manual entry"
+    },
+    {
+      "trade_id": "MAN_NVDA_20260519_152247_515462",
+      "symbol": "NVDA",
+      "signal_id": "manual_MAN_NVDA_20260519_152247_515462",
+      "entry_price": 215.0,
+      "entry_date": "2026-05-19 15:22:47.515487",
+      "position_size": 100.0,
+      "stop_loss": null,
+      "take_profit": null,
+      "status": "closed",
+      "exit_price": 221.775,
+      "exit_date": "2026-05-19 15:22:59.624719",
+      "exit_reason": "Closed at current price",
+      "pnl": 677.5000000000006,
+      "pnl_percent": 3.1511627906976774,
+      "notes": "Manual entry"
     }
   ],
-  "saved_at": "2026-05-19T14:02:30.866935"
+  "saved_at": "2026-05-19T15:22:59.624801"
 }

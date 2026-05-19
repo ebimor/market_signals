@@ -9,6 +9,46 @@ interface SignalReviewProps {
   loading: boolean;
 }
 
+function getSuggestionAnalysis(signal: Signal): string[] {
+  const reason = (signal.reason || '').toLowerCase();
+  const lines: string[] = [];
+
+  if (reason.includes('rsi')) {
+    lines.push('RSI momentum contributed to this setup (overbought/oversold context).');
+  }
+  if (reason.includes('macd')) {
+    lines.push('MACD trend/crossover confirmed directional momentum.');
+  }
+  if (reason.includes('bollinger') || reason.includes('bb')) {
+    lines.push('Bollinger position suggests price is stretched or mean-reverting.');
+  }
+  if (reason.includes('ema') || reason.includes('moving average')) {
+    lines.push('Price-vs-EMA trend alignment supported this suggestion.');
+  }
+  if (reason.includes('volume')) {
+    lines.push('Volume behavior supported the move quality.');
+  }
+
+  const hasRisk = Number.isFinite(signal.stop_loss) && Number.isFinite(signal.take_profit) && Number.isFinite(signal.price);
+  if (hasRisk) {
+    if (signal.type === 'BUY') {
+      const risk = Math.max(0, signal.price - signal.stop_loss).toFixed(2);
+      const reward = Math.max(0, signal.take_profit - signal.price).toFixed(2);
+      lines.push(`Risk/Reward setup: risk $${risk}, target reward $${reward}.`);
+    } else if (signal.type === 'SELL') {
+      const risk = Math.max(0, signal.stop_loss - signal.price).toFixed(2);
+      const reward = Math.max(0, signal.price - signal.take_profit).toFixed(2);
+      lines.push(`Risk/Reward setup: risk $${risk}, target reward $${reward}.`);
+    }
+  }
+
+  if (lines.length === 0) {
+    lines.push('Composite monitor conditions and confidence threshold triggered this suggestion.');
+  }
+
+  return lines;
+}
+
 export const SignalReview: React.FC<SignalReviewProps> = ({
   signals,
   onApprove,
@@ -73,7 +113,12 @@ export const SignalReview: React.FC<SignalReviewProps> = ({
             </div>
 
             <div className="signal-reason">
-              <small>{signal.reason}</small>
+              <small><strong>Created suggestion:</strong> {signal.reason}</small>
+              <ul className="signal-analysis-list">
+                {getSuggestionAnalysis(signal).map((line, idx) => (
+                  <li key={`${signal.signal_id}-analysis-${idx}`}>{line}</li>
+                ))}
+              </ul>
             </div>
 
             <div className="modifications">

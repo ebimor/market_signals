@@ -45,6 +45,25 @@ class MarketDataFetcher:
             logger.warning(f"Questrade price lookup failed for {ticker}: {e}")
             return None
 
+    def _get_provider_mode(self) -> str:
+        mode = str(getattr(settings, "market_data_provider", "questrade") or "questrade").strip().lower()
+        if mode not in {"questrade", "yahoo", "auto"}:
+            return "questrade"
+        return mode
+
+    def _get_questrade_historical_data(self, ticker: str, period: str, interval: str) -> Optional[pd.DataFrame]:
+        if self._questrade_client is None or not self._questrade_client.is_configured:
+            return None
+
+        try:
+            data = self._questrade_client.get_historical_data(ticker, period=period, interval=interval)
+            if data is not None and not data.empty:
+                logger.info(f"Using Questrade historical data for {ticker}")
+                return data
+        except Exception as e:
+            logger.warning(f"Questrade historical lookup failed for {ticker}: {e}")
+        return None
+
     def get_price_with_timestamp(self, ticker: str) -> Optional[Dict[str, any]]:
         """
         Get current price with timestamp converted to Toronto timezone
@@ -109,7 +128,8 @@ class MarketDataFetcher:
                 return {
                     "price": float(quote.get("last_trade_price")),
                     "timestamp": timestamp_str,
-                    "source": "live"
+                    "source": "live",
+                    "provider": "questrade"
                 }
         except Exception as e:
             logger.warning(f"Questrade price with timestamp lookup failed for {ticker}: {e}")
@@ -119,6 +139,20 @@ class MarketDataFetcher:
     def _cache_file_path(self, ticker: str, interval: str = "1d") -> Path:
         safe_ticker = ticker.upper().replace("^", "IDX_")
         return self.cache_dir / f"{safe_ticker}_{interval}.csv"
+
+    def _yfinance_symbol_candidates(self, ticker: str) -> List[str]:
+        """Return yfinance symbol candidates for a logical ticker.
+
+        Tries the raw ticker first, then common Canadian listing suffix.
+        """
+        base = ticker.upper().strip()
+        candidates: List[str] = [base]
+
+        # If no exchange suffix is provided, try TSX suffix as fallback.
+        if "." not in base and not base.startswith("^"):
+            candidates.append(f"{base}.TO")
+
+        return candidates
 
     def _save_disk_cache(self, ticker: str, interval: str, data: pd.DataFrame) -> None:
         """Persist historical data to disk as fallback when yfinance is unavailable."""
@@ -163,17 +197,24 @@ class MarketDataFetcher:
         Returns:
             Current price or None if failed
         """
-        questrade_price = self._get_questrade_price(ticker)
-        if questrade_price is not None:
-            return questrade_price
+        mode = self._get_provider_mode()
 
-        try:
-            data = yf.Ticker(ticker)
-            info = data.history(period="1d")
-            if not info.empty:
-                return float(info["Close"].iloc[-1])
-        except Exception as e:
-            logger.error(f"Error fetching price for {ticker}: {e}")
+        if mode in {"questrade", "auto"}:
+            questrade_price = self._get_questrade_price(ticker)
+            if questrade_price is not None:
+                return questrade_price
+
+        if mode in {"yahoo", "auto"}:
+            for candidate in self._yfinance_symbol_candidates(ticker):
+                try:
+                    data = yf.Ticker(candidate)
+                    info = data.history(period="1d")
+                    if not info.empty:
+                        if candidate != ticker.upper():
+                            logger.info(f"Using yfinance fallback symbol {candidate} for {ticker}")
+                        return float(info["Close"].iloc[-1])
+                except Exception as e:
+                    logger.error(f"Error fetching price for {candidate} (requested {ticker}): {e}")
 
         # Fallback to latest close from cached historical data
         historical = self.get_historical_data(ticker, period="1mo", interval="1d", use_cache=True)
@@ -204,7 +245,8 @@ class MarketDataFetcher:
             DataFrame with OHLCV data or None if failed
         """
         ticker = ticker.upper()
-        cache_key = f"{ticker}_{period}_{interval}"
+        mode = self._get_provider_mode()
+        cache_key = f"{mode}_{ticker}_{period}_{interval}"
         
         # Check cache
         if use_cache and cache_key in self._cache:
@@ -215,14 +257,28 @@ class MarketDataFetcher:
         
         try:
             logger.info(f"Fetching {period} data for {ticker} at {interval} interval")
-            data = yf.download(
-                ticker,
-                period=period,
-                interval=interval,
-                progress=False,
-                threads=False,
-                auto_adjust=False,
-            )
+
+            data = pd.DataFrame()
+
+            if mode in {"questrade", "auto"}:
+                qt_data = self._get_questrade_historical_data(ticker, period=period, interval=interval)
+                if qt_data is not None and not qt_data.empty:
+                    data = qt_data
+
+            if data.empty and mode in {"yahoo", "auto"}:
+                for candidate in self._yfinance_symbol_candidates(ticker):
+                    data = yf.download(
+                        candidate,
+                        period=period,
+                        interval=interval,
+                        progress=False,
+                        threads=False,
+                        auto_adjust=False,
+                    )
+                    if not data.empty:
+                        if candidate != ticker:
+                            logger.info(f"Using yfinance fallback symbol {candidate} for {ticker}")
+                        break
             
             if data.empty:
                 logger.warning(f"No live data returned for {ticker}; trying local cache")

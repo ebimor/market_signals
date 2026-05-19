@@ -5,9 +5,11 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+import pandas as pd
 import requests
 
 from backend.config import settings
@@ -185,3 +187,90 @@ class QuestradeClient:
             return None
 
         return None
+
+    def get_historical_data(self, ticker: str, period: str = "3mo", interval: str = "1d") -> Optional[pd.DataFrame]:
+        """Fetch historical OHLCV candles from Questrade."""
+        symbol_info = self.search_symbol(ticker)
+        if not symbol_info:
+            return None
+
+        symbol_id = symbol_info.get("symbolId")
+        if symbol_id is None:
+            return None
+
+        interval_map = {
+            "1m": "OneMinute",
+            "5m": "FiveMinutes",
+            "15m": "FifteenMinutes",
+            "30m": "HalfHour",
+            "60m": "OneHour",
+            "1d": "OneDay",
+            "1wk": "OneWeek",
+            "1mo": "OneMonth",
+        }
+        qt_interval = interval_map.get(interval, "OneDay")
+
+        days_map = {
+            "1d": 1,
+            "5d": 5,
+            "1mo": 30,
+            "3mo": 90,
+            "6mo": 180,
+            "1y": 365,
+            "2y": 730,
+            "5y": 1825,
+            "10y": 3650,
+            "ytd": 365,
+            "max": 3650,
+        }
+        lookback_days = days_map.get(period, 90)
+
+        now = datetime.now(timezone.utc)
+        start = now - timedelta(days=lookback_days)
+
+        def _qt_time(ts: datetime) -> str:
+            # Questrade candles endpoint expects timezone-aware ISO timestamp.
+            # Use whole seconds and explicit UTC offset marker.
+            return ts.replace(microsecond=0).isoformat().replace("+00:00", "-00:00")
+
+        payload = self._request_json(
+            f"/v1/markets/candles/{symbol_id}",
+            params={
+                "startTime": _qt_time(start),
+                "endTime": _qt_time(now),
+                "interval": qt_interval,
+            },
+        )
+        if not payload:
+            return None
+
+        candles = payload.get("candles", []) or []
+        if not candles:
+            return None
+
+        rows = []
+        for candle in candles:
+            ts = candle.get("end") or candle.get("start")
+            if ts is None:
+                continue
+
+            rows.append(
+                {
+                    "timestamp": pd.to_datetime(ts),
+                    "open": candle.get("open"),
+                    "high": candle.get("high"),
+                    "low": candle.get("low"),
+                    "close": candle.get("close"),
+                    "volume": candle.get("volume"),
+                }
+            )
+
+        if not rows:
+            return None
+
+        df = pd.DataFrame(rows).dropna(subset=["timestamp", "open", "high", "low", "close"])
+        if df.empty:
+            return None
+
+        df = df.set_index("timestamp").sort_index()
+        return df

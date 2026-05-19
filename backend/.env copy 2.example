@@ -10,6 +10,8 @@ DATABASE_URL=sqlite:///./safeswing.db
 
 # Market Data
 MARKET_DATA_REFRESH_INTERVAL=60
+# Provider mode: questrade | yahoo | auto
+MARKET_DATA_PROVIDER=questrade
 
 # Risk Management
 DEFAULT_ACCOUNT_RISK_PERCENT=0.01
