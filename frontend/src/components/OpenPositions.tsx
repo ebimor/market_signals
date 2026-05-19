@@ -9,6 +9,8 @@ interface OpenPositionsProps {
 
 export const OpenPositions: React.FC<OpenPositionsProps> = ({ trades, status: _status }) => {
   const [quotes, setQuotes] = useState<Record<string, TickerQuote>>({});
+  const [closingTrade, setClosingTrade] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const symbols = Array.from(new Set(trades.map(t => t.symbol)));
@@ -42,6 +44,29 @@ export const OpenPositions: React.FC<OpenPositionsProps> = ({ trades, status: _s
     return () => { canceled = true; };
   }, [trades]);
 
+  const handleClosePosition = async (trade: Trade) => {
+    const currentQuote = quotes[trade.symbol];
+    if (!currentQuote || currentQuote.price === null) {
+      setError(`Cannot close ${trade.symbol}: price not available`);
+      return;
+    }
+
+    setClosingTrade(trade.trade_id);
+    setError(null);
+
+    try {
+      await api.closeTrade(
+        trade.trade_id,
+        currentQuote.price,
+        'Closed at current price'
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to close position');
+    } finally {
+      setClosingTrade(null);
+    }
+  };
+
   if (trades.length === 0) {
     return (
       <div className="open-positions">
@@ -54,6 +79,7 @@ export const OpenPositions: React.FC<OpenPositionsProps> = ({ trades, status: _s
   return (
     <div className="open-positions">
       <h2>Open Positions ({trades.length})</h2>
+      {error && <div className="position-error">⚠️ {error}</div>}
       <div className="positions-list">
         {trades.map(trade => (
           <div key={trade.trade_id} className="position-card">
@@ -89,6 +115,14 @@ export const OpenPositions: React.FC<OpenPositionsProps> = ({ trades, status: _s
                 Distance to SL: {typeof trade.stop_loss === 'number' ? `$${(trade.entry_price - trade.stop_loss).toFixed(2)}` : 'N/A'}
               </div>
             </div>
+            <button
+              onClick={() => handleClosePosition(trade)}
+              disabled={closingTrade === trade.trade_id || quotes[trade.symbol]?.price === null}
+              className="close-position-btn"
+              title={quotes[trade.symbol]?.price !== null ? `Close at $${quotes[trade.symbol]?.price?.toFixed(2)}` : 'Price not available'}
+            >
+              {closingTrade === trade.trade_id ? '⏳ Closing...' : '✕ Close Position'}
+            </button>
           </div>
         ))}
       </div>

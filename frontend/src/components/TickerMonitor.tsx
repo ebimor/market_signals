@@ -10,6 +10,7 @@ export const TickerMonitor: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoricalBar[]>([]);
+  const [refreshingTicker, setRefreshingTicker] = useState<string | null>(null);
 
   const loadAll = async (options?: { silent?: boolean }) => {
     const silent = options?.silent ?? false;
@@ -30,9 +31,10 @@ export const TickerMonitor: React.FC = () => {
   };
 
   useEffect(() => {
-    loadAll();
-    const interval = setInterval(() => loadAll({ silent: true }), 10000);
-    return () => clearInterval(interval);
+    // Load monitored tickers list on mount (not their data)
+    api.getMonitoredTickers()
+      .then(tickers => setTickersInput(tickers.join(', ')))
+      .catch(err => setError(err instanceof Error ? err.message : 'Failed to load tickers'));
   }, []);
 
   const selected = useMemo(
@@ -76,6 +78,21 @@ export const TickerMonitor: React.FC = () => {
     }
   };
 
+  const handleRefreshTicker = async (symbol: string) => {
+    setRefreshingTicker(symbol);
+    try {
+      const overview = await api.getMonitorOverview();
+      const updated = overview.find(i => i.symbol === symbol);
+      if (updated) {
+        setItems(prev => prev.map(i => i.symbol === symbol ? updated : i));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `Failed to refresh ${symbol}`);
+    } finally {
+      setRefreshingTicker(null);
+    }
+  };
+
   return (
     <div className="ticker-monitor">
       <div className="ticker-monitor-head">
@@ -93,6 +110,9 @@ export const TickerMonitor: React.FC = () => {
         <button onClick={handleSave} disabled={saving} className="ticker-save-btn">
           {saving ? 'Saving...' : 'Update List'}
         </button>
+        <button onClick={() => loadAll()} disabled={loading} className="ticker-refresh-btn" title="Manually fetch data for all monitored tickers">
+          {loading ? '⏳ Loading...' : '🔄 Refresh All'}
+        </button>
       </div>
 
       {error && <div className="ticker-error">⚠️ {error}</div>}
@@ -109,8 +129,22 @@ export const TickerMonitor: React.FC = () => {
               <strong>{item.symbol}</strong>
               <span className={`signal-pill ${item.signal.toLowerCase()}`}>{item.signal}</span>
             </div>
+            {item.price !== null && (
+              <div className="ticker-price">
+                ${item.price.toFixed(2)}
+                {item.price_source === 'live' && <span className="price-badge">LIVE</span>}
+              </div>
+            )}
             <div className="ticker-condition">{item.condition}</div>
             <div className="ticker-confidence">Confidence: {item.confidence.toFixed(0)}%</div>
+            <button 
+              onClick={() => handleRefreshTicker(item.symbol)}
+              disabled={refreshingTicker === item.symbol}
+              className="ticker-card-refresh"
+              title="Refresh this ticker's data"
+            >
+              {refreshingTicker === item.symbol ? '⏳' : '🔄'}
+            </button>
           </div>
         ))}
       </div>
@@ -130,21 +164,23 @@ export const TickerMonitor: React.FC = () => {
             <div className="detail-line"><span>Latest Update:</span> {new Date(selected.last_updated).toLocaleString()}</div>
           )}
 
-          <div className="history-block">
-            <div className="history-title">Recent Historical Closes</div>
-            {history.length === 0 ? (
-              <div className="history-empty">No historical bars available.</div>
-            ) : (
-              <div className="history-list">
-                {history.slice(-10).reverse().map((bar) => (
-                  <div key={bar.timestamp} className="history-row">
-                    <span>{new Date(bar.timestamp).toLocaleDateString()}</span>
-                    <strong>${bar.close.toFixed(2)}</strong>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          {selected.price_source !== 'live' && (
+            <div className="history-block">
+              <div className="history-title">Recent Historical Closes</div>
+              {history.length === 0 ? (
+                <div className="history-empty">No historical bars available.</div>
+              ) : (
+                <div className="history-list">
+                  {history.slice(-10).reverse().map((bar) => (
+                    <div key={bar.timestamp} className="history-row">
+                      <span>{new Date(bar.timestamp).toLocaleDateString()}</span>
+                      <strong>${bar.close.toFixed(2)}</strong>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

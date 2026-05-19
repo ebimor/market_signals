@@ -212,6 +212,20 @@ def _build_quote(symbol: str) -> dict:
     fetcher = get_fetcher()
 
     market_open = _is_regular_us_session_open()
+    
+    # Try to get live Questrade data with timestamp
+    live_quote = fetcher.get_price_with_timestamp(ticker)
+    if live_quote:
+        return {
+            "symbol": ticker,
+            "price": float(live_quote["price"]),
+            "source": "live",
+            "market_open": True,
+            "message": "Live intraday price",
+            "last_updated": live_quote.get("timestamp"),
+        }
+    
+    # Fallback to current price
     current_price = fetcher.get_current_price(ticker)
     data = fetcher.get_historical_data(ticker, period="7d", interval="1d", use_cache=True)
 
@@ -570,6 +584,16 @@ def get_trade_history():
     """
     history = trade_manager.get_trade_history()
     return history
+
+
+@router.delete("/trades/history/{trade_id}")
+def delete_trade_history_entry(trade_id: str):
+    """Delete a closed trade from history."""
+    try:
+        trade_manager.delete_trade_history_entry(trade_id)
+        return {"message": "Trade deleted successfully", "trade_id": trade_id}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/stats", response_model=StatsResponse)

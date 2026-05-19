@@ -362,6 +362,19 @@ class TradeManager:
         """Get all closed trades"""
         closed_trades = [t for t in self.executed_trades if t.status == TradeStatus.CLOSED]
         return [self._trade_to_dict(t) for t in closed_trades]
+
+    def delete_trade_history_entry(self, trade_id: str) -> None:
+        """Delete a closed trade from history."""
+        trade = next((t for t in self.executed_trades if t.trade_id == trade_id), None)
+        if not trade:
+            raise ValueError(f"Trade not found: {trade_id}")
+
+        if trade.status != TradeStatus.CLOSED:
+            raise ValueError(f"Only closed trades can be deleted: {trade_id}")
+
+        self.executed_trades = [t for t in self.executed_trades if t.trade_id != trade_id]
+        self._save_records()
+        logger.info(f"✅ Trade history entry deleted: {trade_id}")
     
     def get_performance_stats(self) -> Dict:
         """Calculate performance statistics"""

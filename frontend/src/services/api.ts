@@ -182,6 +182,14 @@ export const api = {
     return res.json();
   },
 
+  async deleteTradeHistoryEntry(trade_id: string): Promise<{ message: string; trade_id: string }> {
+    const res = await fetch(`${API_BASE}/trades/history/${trade_id}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
   async getStats(): Promise<PerformanceStats> {
     const res = await fetch(`${API_BASE}/stats`);
     return res.json();

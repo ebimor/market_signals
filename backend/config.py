@@ -3,6 +3,7 @@ Configuration management for SafeSwing Trader
 """
 from pydantic_settings import BaseSettings
 from typing import Optional
+from pathlib import Path
 
 
 class Settings(BaseSettings):
@@ -35,9 +36,11 @@ class Settings(BaseSettings):
     alpaca_api_key: Optional[str] = None
     alpaca_secret_key: Optional[str] = None
     alpaca_paper_trading: bool = True
+    questrade_client_id: Optional[str] = None
+    questrade_refresh_token: Optional[str] = None
     
     class Config:
-        env_file = ".env"
+        env_file = str(Path(__file__).resolve().parent / ".env")
         case_sensitive = False
 
 

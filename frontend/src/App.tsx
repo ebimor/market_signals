@@ -72,7 +72,7 @@ function App() {
           <ManualTrade openTrades={openTrades} stats={stats} onTradeAdded={refreshAll} />
         )}
         {activeTab === 'history' && (
-          <TradeHistory trades={tradeHistory} />
+          <TradeHistory trades={tradeHistory} onDeleted={refreshAll} />
         )}
         {activeTab === 'performance' && (
           <PerformanceDashboard stats={stats} trades={tradeHistory} />

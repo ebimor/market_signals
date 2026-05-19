@@ -45,6 +45,26 @@
   cursor: not-allowed;
 }
 
+.ticker-refresh-btn {
+  border: none;
+  border-radius: 6px;
+  padding: 0.6rem 0.9rem;
+  background: #10b981;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ticker-refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ticker-refresh-btn:hover:not(:disabled) {
+  background: #059669;
+}
+
 .ticker-error {
   margin-bottom: 0.8rem;
   background: #fee2e2;
@@ -96,6 +116,26 @@
 .signal-pill.sell { background: #fee2e2; color: #991b1b; }
 .signal-pill.hold { background: #fef3c7; color: #92400e; }
 
+.ticker-price {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-top: 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.price-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  background: #10b981;
+  color: #ffffff;
+  border-radius: 3px;
+  padding: 0.1rem 0.3rem;
+  text-transform: uppercase;
+}
+
 .ticker-condition {
   margin-top: 0.45rem;
   color: #111827;
@@ -106,6 +146,27 @@
   font-size: 0.82rem;
   color: #6b7280;
   margin-top: 0.2rem;
+}
+
+.ticker-card-refresh {
+  margin-top: 0.4rem;
+  width: 100%;
+  border: none;
+  background: #e5e7eb;
+  color: #374151;
+  padding: 0.3rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ticker-card-refresh:hover:not(:disabled) {
+  background: #d1d5db;
+}
+
+.ticker-card-refresh:disabled {
+  opacity: 0.5;
 }
 
 .ticker-detail-panel {

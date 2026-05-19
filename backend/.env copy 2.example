@@ -28,5 +28,5 @@ ALPACA_PAPER_TRADING=True
 
 # Questrade (for live market data/signals)
 # Get these from Questrade API access settings
-QUESTRADE_CLIENT_ID=emoradis
-QUESTRADE_REFRESH_TOKEN=zeEhz1ZX_iVrT4kJwWvHk_4havwOVW5W0
+# QUESTRADE_CLIENT_ID=
+# QUESTRADE_REFRESH_TOKEN=

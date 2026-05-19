@@ -8,6 +8,10 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, List, Tuple
 import logging
 from pathlib import Path
+import pytz
+
+from backend.config import settings
+from backend.market_data.questrade_client import QuestradeClient
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +30,91 @@ class MarketDataFetcher:
         self._cache: Dict[str, Tuple[pd.DataFrame, datetime]] = {}
         self.cache_dir = Path("backend/data/cache")
         self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self._questrade_client = QuestradeClient() if settings.questrade_refresh_token else None
+
+    def _get_questrade_price(self, ticker: str) -> Optional[float]:
+        if self._questrade_client is None or not self._questrade_client.is_configured:
+            return None
+
+        try:
+            price = self._questrade_client.get_current_price(ticker)
+            if price is not None:
+                logger.info(f"Using Questrade live price for {ticker}")
+            return price
+        except Exception as e:
+            logger.warning(f"Questrade price lookup failed for {ticker}: {e}")
+            return None
+
+    def get_price_with_timestamp(self, ticker: str) -> Optional[Dict[str, any]]:
+        """
+        Get current price with timestamp converted to Toronto timezone
+        
+        Args:
+            ticker: Stock ticker symbol
+            
+        Returns:
+            Dict with price, timestamp (Toronto time in ISO format), and source, or None if failed
+        """
+        if self._questrade_client is None or not self._questrade_client.is_configured:
+            return None
+
+        try:
+            quote = self._questrade_client.get_quote(ticker)
+            if quote and quote.get("last_trade_price"):
+                timestamp_str = quote.get("last_trade_time")
+                
+                # Parse and convert timestamp to Toronto timezone
+                try:
+                    # Questrade returns timestamps in Eastern Time (either ET or EDT)
+                    # Format is typically ISO 8601 with timezone info
+                    # Try parsing as ISO format
+                    if timestamp_str:
+                        # Parse the timestamp - could be ISO format with or without timezone
+                        dt = None
+                        try:
+                            # Try ISO format with Z (UTC)
+                            if timestamp_str.endswith('Z'):
+                                dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                            # Try ISO format with timezone offset
+                            elif '+' in timestamp_str or timestamp_str.count('-') > 2:
+                                dt = datetime.fromisoformat(timestamp_str)
+                            else:
+                                # Assume Eastern Time if no timezone info
+                                dt = datetime.fromisoformat(timestamp_str)
+                        except ValueError:
+                            # Fallback: try parsing common formats
+                            try:
+                                dt = datetime.strptime(timestamp_str, "%Y-%m-%dT%H:%M:%S")
+                            except ValueError:
+                                logger.warning(f"Could not parse Questrade timestamp: {timestamp_str}")
+                                dt = None
+                        
+                        if dt:
+                            # If naive (no timezone), assume it's in Eastern Time
+                            if dt.tzinfo is None:
+                                eastern = pytz.timezone('America/Toronto')
+                                dt = eastern.localize(dt)
+                            else:
+                                # Convert to Toronto timezone
+                                eastern = pytz.timezone('America/Toronto')
+                                dt = dt.astimezone(eastern)
+                            
+                            # Return ISO format with timezone
+                            timestamp_str = dt.isoformat()
+                except Exception as e:
+                    logger.warning(f"Error converting Questrade timestamp to Toronto time: {e}")
+                    # Fall back to using the raw timestamp
+                    pass
+                
+                return {
+                    "price": float(quote.get("last_trade_price")),
+                    "timestamp": timestamp_str,
+                    "source": "live"
+                }
+        except Exception as e:
+            logger.warning(f"Questrade price with timestamp lookup failed for {ticker}: {e}")
+        
+        return None
 
     def _cache_file_path(self, ticker: str, interval: str = "1d") -> Path:
         safe_ticker = ticker.upper().replace("^", "IDX_")
@@ -74,6 +163,10 @@ class MarketDataFetcher:
         Returns:
             Current price or None if failed
         """
+        questrade_price = self._get_questrade_price(ticker)
+        if questrade_price is not None:
+            return questrade_price
+
         try:
             data = yf.Ticker(ticker)
             info = data.history(period="1d")
