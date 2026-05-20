@@ -360,6 +360,54 @@ def _condition_and_action(signal: str, confidence: float) -> tuple[str, str]:
     return "Mixed / neutral", "Hold and wait"
 
 
+def _compute_market_regime(fetcher) -> dict:
+    """Compute market regime context from SPY trend, VIX, and macro-event toggle."""
+    spy_trend_positive = None
+    vix_value = None
+
+    try:
+        spy_data = fetcher.get_historical_data("SPY", period="6mo", interval="1d", use_cache=True)
+        if spy_data is None or spy_data.empty:
+            spy_data = yf.download("SPY", period="6mo", interval="1d", progress=False, threads=False, auto_adjust=False)
+        if spy_data is not None and not spy_data.empty:
+            spy_norm = _normalize_ohlcv_columns(spy_data)
+            if "Close" in spy_norm.columns:
+                series = pd.Series(spy_norm["Close"].values, index=pd.to_datetime(spy_norm.index, utc=True)).dropna()
+                if len(series) >= 50:
+                    ma20 = series.rolling(20).mean().iloc[-1]
+                    ma50 = series.rolling(50).mean().iloc[-1]
+                    last_close = float(series.iloc[-1])
+                    spy_trend_positive = bool(last_close > float(ma50) and float(ma20) > float(ma50))
+    except Exception as exc:
+        logger.warning("SPY regime check failed: %s", exc)
+
+    try:
+        # Single present-time request from Questrade symbol, shared across all tickers.
+        # This function is called once per monitor overview request.
+        live_vix = fetcher.get_price_with_timestamp("VIXW.IN")
+        if live_vix and live_vix.get("price") is not None:
+            vix_value = float(live_vix["price"])
+        else:
+            fallback_vix = fetcher.get_current_price("VIXW.IN")
+            if fallback_vix is not None:
+                vix_value = float(fallback_vix)
+    except Exception as exc:
+        logger.warning("VIX Questrade check failed: %s", exc)
+
+    vix_threshold = float(getattr(settings, "vix_threshold", 30.0) or 30.0)
+    # If VIX cannot be fetched, treat as neutral (non-blocking) instead of forcing HOLD.
+    vix_acceptable = True if vix_value is None else (vix_value <= vix_threshold)
+    no_major_macro_event = not bool(getattr(settings, "major_macro_event", False))
+
+    return {
+        "spy_trend_positive": spy_trend_positive,
+        "vix_value": vix_value,
+        "vix_threshold": vix_threshold,
+        "vix_acceptable": vix_acceptable,
+        "no_major_macro_event": no_major_macro_event,
+    }
+
+
 def _build_auto_signal_reason(item: dict) -> str:
     """Build a concise analysis reason for monitor-derived signals."""
     symbol = str(item.get("symbol") or "").upper()
@@ -545,6 +593,7 @@ def get_monitor_overview():
     tickers = trade_manager.get_monitored_tickers()
     fetcher = get_fetcher()
     generator = SignalGenerator()
+    regime = _compute_market_regime(fetcher)
 
     overview = []
     for ticker in tickers:
@@ -582,6 +631,38 @@ def get_monitor_overview():
                 ema_value = (components.get("ema", {}) or {}).get("value")
                 bb_position = (components.get("bb", {}) or {}).get("value")
                 current_close = float(normalized["Close"].iloc[-1]) if not normalized.empty else None
+                atr_pct = (components.get("atr", {}) or {}).get("atr_pct")
+                min_atr_pct = float(getattr(settings, "min_atr_percent_for_buy", 5.0) or 5.0)
+
+                # Market-regime gating for BUY suggestions
+                if signal == "BUY":
+                    spy_ok = bool(regime.get("spy_trend_positive"))
+                    vix_ok = bool(regime.get("vix_acceptable"))
+                    macro_ok = bool(regime.get("no_major_macro_event"))
+                    atr_ok = bool(atr_pct is not None and float(atr_pct) > min_atr_pct)
+
+                    if not (spy_ok and vix_ok and macro_ok and atr_ok):
+                        signal = "HOLD"
+                        confidence = min(confidence, 45.0)
+                        blockers = []
+                        if not spy_ok:
+                            blockers.append("SPY trend not positive")
+                        if regime.get("vix_value") is not None and not vix_ok:
+                            blockers.append(
+                                f"VIX not acceptable ({regime.get('vix_value') if regime.get('vix_value') is not None else 'N/A'} > {regime.get('vix_threshold')})"
+                            )
+                        if not macro_ok:
+                            blockers.append("Major macro event risk enabled")
+                        if not atr_ok:
+                            blockers.append(f"ATR% not above {min_atr_pct}")
+                        condition = "BUY blocked by market regime filter"
+                        action = "Hold — " + "; ".join(blockers)
+                    else:
+                        condition = (
+                            f"Bullish momentum + regime pass (SPY↑, VIX≤{regime.get('vix_threshold')}, "
+                            f"no macro event, ATR%>{min_atr_pct})"
+                        )
+                        action = "Consider opening or adding to a long position"
 
                 rsi_4h = _calculate_rsi_timeframe(
                     fetcher,
@@ -663,6 +744,22 @@ def get_monitor_overview():
                         "high_trigger": 80.0,
                         "unit": "%",
                         "description": "BUY below 20%, SELL above 80%",
+                    },
+                    {
+                        "name": "ATR %",
+                        "current": float(atr_pct) if atr_pct is not None else None,
+                        "low_trigger": min_atr_pct,
+                        "high_trigger": 999.0,
+                        "unit": "%",
+                        "description": f"Regime filter target: ATR% must be above {min_atr_pct} for BUY",
+                    },
+                    {
+                        "name": "VIX Level",
+                        "current": float(regime.get("vix_value")) if regime.get("vix_value") is not None else None,
+                        "low_trigger": 0.0,
+                        "high_trigger": float(regime.get("vix_threshold") or 30.0),
+                        "unit": "index",
+                        "description": f"Regime filter: VIX should be ≤ {float(regime.get('vix_threshold') or 30.0)}",
                     },
                 ]
 

@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     
     # Signal Engine
     vix_threshold: float = 30.0
+    min_atr_percent_for_buy: float = 5.0
+    major_macro_event: bool = False
     
     # External APIs
     polygon_api_key: Optional[str] = None

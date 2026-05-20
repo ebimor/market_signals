@@ -19,6 +19,26 @@ export const TickerMonitor: React.FC = () => {
   const [refreshingTicker, setRefreshingTicker] = useState<string | null>(null);
   const [refreshingAll, setRefreshingAll] = useState(false);
 
+  const isMarketOpenET = () => {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      weekday: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(new Date());
+
+    const weekday = parts.find((p) => p.type === 'weekday')?.value ?? '';
+    if (weekday === 'Sat' || weekday === 'Sun') return false;
+
+    const hour = Number(parts.find((p) => p.type === 'hour')?.value ?? '0');
+    const minute = Number(parts.find((p) => p.type === 'minute')?.value ?? '0');
+    const totalMinutes = hour * 60 + minute;
+
+    // 9:30 AM to 4:00 PM ET
+    return totalMinutes >= (9 * 60 + 30) && totalMinutes <= (16 * 60);
+  };
+
   const loadAll = async (options?: { silent?: boolean }) => {
     const silent = options?.silent ?? false;
     if (!silent) setLoading(true);
@@ -171,6 +191,24 @@ export const TickerMonitor: React.FC = () => {
       setRefreshingAll(false);
     }
   };
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (!isMarketOpenET()) return;
+
+      try {
+        await loadAll({ silent: true });
+        if (selectedSymbol) {
+          const resp = await api.getMonitorHistory(selectedSymbol, '1d', '6mo', 120);
+          setHistory(resp.bars ?? []);
+        }
+      } catch {
+        // keep existing UI state on background auto-refresh errors
+      }
+    }, 120000);
+
+    return () => clearInterval(interval);
+  }, [selectedSymbol]);
 
   const sourceLabel = (source: MonitorItem['price_source'], provider: string) => {
     const providerLabel = provider === 'questrade'
