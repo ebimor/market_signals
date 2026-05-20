@@ -368,6 +368,8 @@ export const TickerMonitor: React.FC = () => {
       firstDate: new Date(historySeries[0].t).toLocaleDateString(),
     };
   }, [historySeries, selected?.signal, selected?.suggested_stop_loss, selected?.suggested_take_profit]);
+  const isRegimeBlockedCondition = (condition?: string | null) =>
+    Boolean(condition && condition.toLowerCase().includes('buy blocked by market regime filter'));
 
   return (
     <div className="ticker-monitor">
@@ -475,7 +477,7 @@ export const TickerMonitor: React.FC = () => {
           {sortedItems.map(item => (
             <div
               key={item.symbol}
-              className={`ticker-card ${item.signal.toLowerCase()} ${selectedSymbol === item.symbol ? 'active' : ''}`}
+              className={`ticker-card ${item.signal.toLowerCase()} ${selectedSymbol === item.symbol ? 'active' : ''} ${isRegimeBlockedCondition(item.condition) ? 'regime-blocked' : ''}`}
               onClick={() => setSelectedSymbol(item.symbol)}
             >
               <div className="ticker-top-row">
@@ -488,7 +490,6 @@ export const TickerMonitor: React.FC = () => {
                   {item.price_source === 'live' && <span className="price-badge">LIVE</span>}
                 </div>
               )}
-              <div className="ticker-condition">{item.condition}</div>
               <div className="ticker-confidence">Confidence: {item.confidence.toFixed(0)}%</div>
               <div className="ticker-source">Source: {sourceLabel(item.price_source, item.data_provider)}</div>
               <button 
@@ -511,7 +512,11 @@ export const TickerMonitor: React.FC = () => {
         <div className="ticker-detail-panel">
           <h3>{selected.symbol} — Current Condition</h3>
           <div className="detail-line"><span>Signal:</span> {selected.signal} ({selected.confidence.toFixed(1)}%)</div>
-          <div className="detail-line"><span>Condition:</span> {selected.condition}</div>
+          <div className={`detail-line ${isRegimeBlockedCondition(selected.condition) ? 'warning' : ''}`}>
+            <span>Condition:</span>{' '}
+            {isRegimeBlockedCondition(selected.condition) ? '⚠️ ' : ''}
+            {selected.condition}
+          </div>
           <div className="detail-line"><span>Suggested Action:</span> {selected.action}</div>
           <div className="detail-line"><span>Data Source:</span> {sourceLabel(selected.price_source, selected.data_provider)}</div>
           <div className="detail-line">

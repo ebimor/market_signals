@@ -632,14 +632,14 @@ def get_monitor_overview():
                 bb_position = (components.get("bb", {}) or {}).get("value")
                 current_close = float(normalized["Close"].iloc[-1]) if not normalized.empty else None
                 atr_pct = (components.get("atr", {}) or {}).get("atr_pct")
-                min_atr_pct = float(getattr(settings, "min_atr_percent_for_buy", 5.0) or 5.0)
+                max_atr_pct = float(getattr(settings, "max_atr_percent_for_buy", 2.0) or 2.0)
 
                 # Market-regime gating for BUY suggestions
                 if signal == "BUY":
                     spy_ok = bool(regime.get("spy_trend_positive"))
                     vix_ok = bool(regime.get("vix_acceptable"))
                     macro_ok = bool(regime.get("no_major_macro_event"))
-                    atr_ok = bool(atr_pct is not None and float(atr_pct) > min_atr_pct)
+                    atr_ok = bool(atr_pct is not None and float(atr_pct) <= max_atr_pct)
 
                     if not (spy_ok and vix_ok and macro_ok and atr_ok):
                         signal = "HOLD"
@@ -654,13 +654,13 @@ def get_monitor_overview():
                         if not macro_ok:
                             blockers.append("Major macro event risk enabled")
                         if not atr_ok:
-                            blockers.append(f"ATR% not above {min_atr_pct}")
+                            blockers.append(f"ATR% above {max_atr_pct}")
                         condition = "BUY blocked by market regime filter"
                         action = "Hold — " + "; ".join(blockers)
                     else:
                         condition = (
                             f"Bullish momentum + regime pass (SPY↑, VIX≤{regime.get('vix_threshold')}, "
-                            f"no macro event, ATR%>{min_atr_pct})"
+                            f"no macro event, ATR%≤{max_atr_pct})"
                         )
                         action = "Consider opening or adding to a long position"
 
@@ -748,10 +748,10 @@ def get_monitor_overview():
                     {
                         "name": "ATR %",
                         "current": float(atr_pct) if atr_pct is not None else None,
-                        "low_trigger": min_atr_pct,
+                        "low_trigger": max_atr_pct,
                         "high_trigger": 999.0,
                         "unit": "%",
-                        "description": f"Regime filter target: ATR% must be above {min_atr_pct} for BUY",
+                        "description": f"Regime filter target: ATR% should be ≤ {max_atr_pct} for BUY",
                     },
                     {
                         "name": "VIX Level",

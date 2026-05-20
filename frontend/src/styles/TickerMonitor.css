@@ -268,6 +268,10 @@
 .ticker-card.buy { border-left-color: #16a34a; }
 .ticker-card.sell { border-left-color: #dc2626; }
 .ticker-card.hold { border-left-color: #f59e0b; }
+.ticker-card.regime-blocked {
+  border-left-color: #d97706;
+  background: #fffbeb;
+}
 
 .ticker-top-row {
   display: flex;
@@ -310,6 +314,10 @@
   margin-top: 0.45rem;
   color: #111827;
   font-weight: 600;
+}
+
+.ticker-condition.warning {
+  color: #92400e;
 }
 
 .ticker-confidence {
@@ -362,6 +370,11 @@
   font-size: 0.9rem;
   color: #374151;
   margin-bottom: 0.3rem;
+}
+
+.detail-line.warning {
+  color: #92400e;
+  font-weight: 600;
 }
 
 .detail-line span {

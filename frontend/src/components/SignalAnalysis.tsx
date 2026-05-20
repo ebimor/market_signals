@@ -1,6 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import { Signal } from '../services/api';
 
+async function fetchJsonSafe<T>(url: string): Promise<T> {
+  const res = await fetch(url);
+  const raw = await res.text();
+  let data: any = null;
+
+  if (raw.trim()) {
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      throw new Error(raw.split('\n')[0] || 'Invalid server response');
+    }
+  }
+
+  if (!res.ok) {
+    throw new Error(data?.detail || data?.message || raw.split('\n')[0] || `Request failed (${res.status})`);
+  }
+
+  return data as T;
+}
+
 interface SignalAnalysisProps {
   signals: Signal[];
 }
@@ -97,12 +117,10 @@ export const SignalAnalysis: React.FC<SignalAnalysisProps> = ({ signals }) => {
       setIndicatorMap(prev => ({ ...prev, [signal.symbol]: { loading: true } }));
 
       // Fetch RSI
-      fetch(`http://localhost:8000/api/market/indicators/rsi/${signal.symbol}?lookback=30`)
-        .then(r => r.json())
+      fetchJsonSafe<any>(`/api/market/indicators/rsi/${signal.symbol}?lookback=30`)
         .then(rsiData => {
           // Fetch MACD
-          return fetch(`http://localhost:8000/api/market/indicators/macd/${signal.symbol}?lookback=30`)
-            .then(r => r.json())
+          return fetchJsonSafe<any>(`/api/market/indicators/macd/${signal.symbol}?lookback=30`)
             .then(macdData => {
               setIndicatorMap(prev => ({
                 ...prev,

@@ -30,7 +30,8 @@ class Settings(BaseSettings):
     
     # Signal Engine
     vix_threshold: float = 30.0
-    min_atr_percent_for_buy: float = 5.0
+    max_atr_percent_for_buy: float = 2.0
+    min_atr_percent_for_buy: Optional[float] = None  # deprecated: use max_atr_percent_for_buy
     major_macro_event: bool = False
     
     # External APIs

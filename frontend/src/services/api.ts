@@ -1,6 +1,34 @@
 // API base URL - prefer same-origin proxy to avoid localhost/network mismatch in browser
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.trim() || '/api/trading';
 
+async function parseResponse<T>(res: Response): Promise<T> {
+  const raw = await res.text();
+  const contentType = (res.headers.get('content-type') || '').toLowerCase();
+  const looksLikeJson = contentType.includes('application/json') || raw.trim().startsWith('{') || raw.trim().startsWith('[');
+
+  let data: any = null;
+  if (looksLikeJson && raw.trim()) {
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      if (res.ok) {
+        throw new Error(`Server returned invalid JSON: ${raw.slice(0, 160)}`);
+      }
+    }
+  }
+
+  if (!res.ok) {
+    const message =
+      data?.detail ||
+      data?.message ||
+      (raw ? raw.split('\n')[0].slice(0, 200) : '') ||
+      `Request failed (${res.status})`;
+    throw new Error(message);
+  }
+
+  return (data as T);
+}
+
 export interface Signal {
   signal_id: string;
   symbol: string;
@@ -111,13 +139,13 @@ export const api = {
   // Status
   async getStatus(): Promise<SystemStatus> {
     const res = await fetch(`${API_BASE}/status`);
-    return res.json();
+    return parseResponse<SystemStatus>(res);
   },
 
   // Signals
   async getSignals(): Promise<Signal[]> {
     const res = await fetch(`${API_BASE}/signals`);
-    return res.json();
+    return parseResponse<Signal[]>(res);
   },
 
   async createSignal(signal: Partial<Signal>): Promise<Signal> {
@@ -126,7 +154,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(signal)
     });
-    return res.json();
+    return parseResponse<Signal>(res);
   },
 
   // Approvals
@@ -136,7 +164,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ signal_id, ...modifications })
     });
-    return res.json();
+    return parseResponse<any>(res);
   },
 
   async rejectTrade(signal_id: string, reason?: string): Promise<any> {
@@ -145,7 +173,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ signal_id, reason })
     });
-    return res.json();
+    return parseResponse<any>(res);
   },
 
   // Execution
@@ -155,7 +183,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ signal_id })
     });
-    return res.json();
+    return parseResponse<Trade>(res);
   },
 
   async manualTrade(data: {
@@ -172,8 +200,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    return parseResponse<Trade>(res);
   },
 
   async closeTrade(trade_id: string, exit_price: number, exit_reason: string): Promise<Trade> {
@@ -182,41 +209,40 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ trade_id, exit_price, exit_reason })
     });
-    return res.json();
+    return parseResponse<Trade>(res);
   },
 
   // Queries
   async getOpenTrades(): Promise<Trade[]> {
     const res = await fetch(`${API_BASE}/trades/open`);
-    return res.json();
+    return parseResponse<Trade[]>(res);
   },
 
   async getTradeHistory(): Promise<Trade[]> {
     const res = await fetch(`${API_BASE}/trades/history`);
-    return res.json();
+    return parseResponse<Trade[]>(res);
   },
 
   async deleteTradeHistoryEntry(trade_id: string): Promise<{ message: string; trade_id: string }> {
     const res = await fetch(`${API_BASE}/trades/history/${trade_id}`, {
       method: 'DELETE'
     });
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    return parseResponse<{ message: string; trade_id: string }>(res);
   },
 
   async getStats(): Promise<PerformanceStats> {
     const res = await fetch(`${API_BASE}/stats`);
-    return res.json();
+    return parseResponse<PerformanceStats>(res);
   },
 
   async getDashboard(): Promise<any> {
     const res = await fetch(`${API_BASE}/dashboard`);
-    return res.json();
+    return parseResponse<any>(res);
   },
 
   async getMonitoredTickers(): Promise<string[]> {
     const res = await fetch(`${API_BASE}/monitor/tickers`);
-    const data = await res.json();
+    const data = await parseResponse<{ tickers?: string[] }>(res);
     return data.tickers ?? [];
   },
 
@@ -226,25 +252,22 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tickers })
     });
-    if (!res.ok) throw new Error(await res.text());
-    const data = await res.json();
+    const data = await parseResponse<{ tickers?: string[] }>(res);
     return data.tickers ?? [];
   },
 
   async getMonitorOverview(): Promise<MonitorItem[]> {
     const res = await fetch(`${API_BASE}/monitor/overview`);
-    return res.json();
+    return parseResponse<MonitorItem[]>(res);
   },
 
   async getQuote(symbol: string): Promise<TickerQuote> {
     const res = await fetch(`${API_BASE}/quote/${symbol}`);
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    return parseResponse<TickerQuote>(res);
   },
 
   async getMonitorHistory(symbol: string, interval = '1d', period = '6mo', limit = 120): Promise<TickerHistory> {
     const res = await fetch(`${API_BASE}/monitor/history/${symbol}?interval=${interval}&period=${period}&limit=${limit}`);
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    return parseResponse<TickerHistory>(res);
   }
 };
