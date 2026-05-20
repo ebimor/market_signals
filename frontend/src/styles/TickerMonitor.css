@@ -348,6 +348,23 @@
   color: #111827;
 }
 
+.metrics-history-layout {
+  margin-top: 0.9rem;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 0.75rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 0.9rem;
+  align-items: start;
+}
+
+.metrics-history-layout .metrics-block,
+.metrics-history-layout .history-block {
+  margin-top: 0;
+  border-top: none;
+  padding-top: 0;
+}
+
 .history-block {
   margin-top: 0.8rem;
   border-top: 1px solid #e5e7eb;
@@ -369,6 +386,98 @@
 .history-list {
   display: grid;
   gap: 0.25rem;
+}
+
+.history-chart-wrap {
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  border-radius: 6px;
+  padding: 0.5rem;
+}
+
+.history-chart {
+  width: 100%;
+  height: 180px;
+  display: block;
+}
+
+.history-axis {
+  stroke: #cbd5e1;
+  stroke-width: 1;
+}
+
+.history-line {
+  stroke: #2563eb;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.history-line-sl {
+  stroke: #dc2626;
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+
+.history-line-tp {
+  stroke: #16a34a;
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+
+.history-line-sl-label,
+.history-line-tp-label {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.history-line-sl-label {
+  fill: #dc2626;
+}
+
+.history-line-tp-label {
+  fill: #16a34a;
+}
+
+.history-chart-meta {
+  margin-top: 0.45rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  color: #4b5563;
+}
+
+.history-targets-meta {
+  margin-top: 0.45rem;
+  display: flex;
+  gap: 0.45rem;
+}
+
+.history-targets-meta .sl-tag,
+.history-targets-meta .tp-tag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.14rem 0.5rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.history-targets-meta .sl-tag {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.history-targets-meta .tp-tag {
+  background: #dcfce7;
+  color: #166534;
+}
+
+@media (max-width: 700px) {
+  .history-chart-meta {
+    flex-direction: column;
+  }
 }
 
 .history-row {
@@ -397,6 +506,12 @@
   margin-top: 0.9rem;
   border-top: 1px solid #e5e7eb;
   padding-top: 0.75rem;
+}
+
+@media (max-width: 1100px) {
+  .metrics-history-layout {
+    grid-template-columns: 1fr;
+  }
 }
 
 .metrics-title {

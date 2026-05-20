@@ -1,5 +1,5 @@
-// API base URL - direct to backend (CORS enabled)
-const API_BASE = 'http://localhost:8000/api/trading';
+// API base URL - prefer same-origin proxy to avoid localhost/network mismatch in browser
+const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.trim() || '/api/trading';
 
 export interface Signal {
   signal_id: string;
@@ -55,6 +55,8 @@ export interface MonitorItem {
   price_message: string;
   last_updated: string | null;
   signal_metrics: SignalMetric[];
+  suggested_stop_loss?: number | null;
+  suggested_take_profit?: number | null;
 }
 
 export interface SignalMetric {

@@ -177,6 +177,68 @@ export const TickerMonitor: React.FC = () => {
     return current <= low || current >= high;
   };
 
+  const historySeries = useMemo(() => {
+    return history
+      .map((bar) => ({
+        t: new Date(bar.timestamp).getTime(),
+        close: bar.close,
+      }))
+      .filter((x) => Number.isFinite(x.t) && Number.isFinite(x.close))
+      .sort((a, b) => a.t - b.t);
+  }, [history]);
+
+  const chart = useMemo(() => {
+    if (historySeries.length < 2) return null;
+
+    const width = 680;
+    const height = 220;
+    const pad = 16;
+
+    const values = historySeries.map((p) => p.close);
+    const fallbackPrice = selected?.price ?? historySeries[historySeries.length - 1]?.close ?? null;
+    const fallbackSL = fallbackPrice !== null ? Number((fallbackPrice * 0.98).toFixed(2)) : null;
+    const fallbackTP = fallbackPrice !== null ? Number((fallbackPrice * 1.04).toFixed(2)) : null;
+    const buySL = selected?.signal === 'BUY' ? (selected?.suggested_stop_loss ?? fallbackSL) : null;
+    const buyTP = selected?.signal === 'BUY' ? (selected?.suggested_take_profit ?? fallbackTP) : null;
+    const overlayValues = [
+      ...values,
+      ...(buySL !== null ? [buySL] : []),
+      ...(buyTP !== null ? [buyTP] : []),
+    ];
+
+    const min = Math.min(...overlayValues);
+    const max = Math.max(...overlayValues);
+    const range = Math.max(max - min, 0.0001);
+
+    const xFor = (i: number) => pad + (i / (historySeries.length - 1)) * (width - pad * 2);
+    const yFor = (v: number) => height - pad - ((v - min) / range) * (height - pad * 2);
+
+    const points = historySeries
+      .map((p, i) => `${xFor(i)},${yFor(p.close)}`)
+      .join(' ');
+
+    const latest = historySeries[historySeries.length - 1]?.close ?? null;
+    const first = historySeries[0]?.close ?? null;
+    const slY = buySL !== null ? yFor(buySL) : null;
+    const tpY = buyTP !== null ? yFor(buyTP) : null;
+
+    return {
+      width,
+      height,
+      points,
+      min,
+      max,
+      latest,
+      first,
+      buySL,
+      buyTP,
+      slY,
+      tpY,
+      latestDate: new Date(historySeries[historySeries.length - 1].t).toLocaleDateString(),
+      firstDate: new Date(historySeries[0].t).toLocaleDateString(),
+    };
+  }, [historySeries, selected?.signal, selected?.suggested_stop_loss, selected?.suggested_take_profit]);
+
   return (
     <div className="ticker-monitor">
       <div className="ticker-monitor-head">
@@ -323,79 +385,110 @@ export const TickerMonitor: React.FC = () => {
             <div className="detail-line"><span>Latest Update:</span> {new Date(selected.last_updated).toLocaleString()}</div>
           )}
 
-          {selected.price_source !== 'live' && (
-            <div className="history-block">
-              <div className="history-title">Recent Historical Closes</div>
-              {history.length === 0 ? (
-                <div className="history-empty">No historical bars available.</div>
-              ) : (
-                <div className="history-list">
-                  {history.slice(-10).reverse().map((bar) => (
-                    <div key={bar.timestamp} className="history-row">
-                      <span>{new Date(bar.timestamp).toLocaleDateString()}</span>
-                      <strong>${bar.close.toFixed(2)}</strong>
-                    </div>
-                  ))}
+          {(selected.signal_metrics?.length > 0 || selected.price_source !== 'live') && (
+            <div className="metrics-history-layout">
+              {selected.signal_metrics && selected.signal_metrics.length > 0 && (
+                <div className="metrics-block">
+                  <div className="metrics-title">Signal Metrics (Current vs Trigger Range)</div>
+                  <div className="metrics-list">
+                    {(() => {
+                      const rsiNames = ['RSI (4H)', 'RSI (Daily)', 'RSI (Weekly)'];
+                      const rsiMetrics = rsiNames
+                        .map((name) => selected.signal_metrics.find((m) => m.name === name))
+                        .filter((m): m is NonNullable<typeof m> => Boolean(m));
+
+                      const nonRsiMetrics = selected.signal_metrics.filter(
+                        (m) => !rsiNames.includes(m.name) && m.name !== 'RSI (Model)'
+                      );
+
+                      return (
+                        <>
+                          {rsiMetrics.length > 0 && (
+                            <div className="metric-row">
+                              <div className="metric-name">RSI Timeframes</div>
+                              <div className="metric-timeframes">
+                                {rsiMetrics.map((metric) => {
+                                  const met = isMetricTriggered(metric.current, metric.low_trigger, metric.high_trigger);
+                                  return (
+                                    <div key={metric.name} className={`metric-timeframe ${met ? 'met' : 'not-met'}`}>
+                                      <span className="metric-status">{met ? '✅' : '🔴'}</span>
+                                      <span>{metric.name.replace('RSI ', '')}: </span>
+                                      <strong>{metric.current !== null ? metric.current.toFixed(2) : 'N/A'}</strong>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              <div className="metric-desc">Trigger met when RSI is below 30 or above 70.</div>
+                            </div>
+                          )}
+
+                          {nonRsiMetrics.map((metric) => {
+                            const met = isMetricTriggered(metric.current, metric.low_trigger, metric.high_trigger);
+                            return (
+                              <div key={metric.name} className="metric-row">
+                                <div className="metric-name">
+                                  <span className="metric-status">{met ? '✅' : '🔴'}</span> {metric.name}
+                                </div>
+                                <div className="metric-values">
+                                  <span>Current: <strong>{metric.current !== null ? metric.current.toFixed(2) : 'N/A'}{metric.unit === '%' ? '%' : ''}</strong></span>
+                                  <span>Low trigger: {metric.low_trigger.toFixed(2)}{metric.unit === '%' ? '%' : ''}</span>
+                                  <span>High trigger: {metric.high_trigger.toFixed(2)}{metric.unit === '%' ? '%' : ''}</span>
+                                </div>
+                                <div className="metric-desc">{metric.description}</div>
+                              </div>
+                            );
+                          })}
+                        </>
+                      );
+                    })()}
+                  </div>
                 </div>
               )}
-            </div>
-          )}
 
-          {selected.signal_metrics && selected.signal_metrics.length > 0 && (
-            <div className="metrics-block">
-              <div className="metrics-title">Signal Metrics (Current vs Trigger Range)</div>
-              <div className="metrics-list">
-                {(() => {
-                  const rsiNames = ['RSI (4H)', 'RSI (Daily)', 'RSI (Weekly)'];
-                  const rsiMetrics = rsiNames
-                    .map((name) => selected.signal_metrics.find((m) => m.name === name))
-                    .filter((m): m is NonNullable<typeof m> => Boolean(m));
-
-                  const nonRsiMetrics = selected.signal_metrics.filter(
-                    (m) => !rsiNames.includes(m.name) && m.name !== 'RSI (Model)'
-                  );
-
-                  return (
-                    <>
-                      {rsiMetrics.length > 0 && (
-                        <div className="metric-row">
-                          <div className="metric-name">RSI Timeframes</div>
-                          <div className="metric-timeframes">
-                            {rsiMetrics.map((metric) => {
-                              const met = isMetricTriggered(metric.current, metric.low_trigger, metric.high_trigger);
-                              return (
-                                <div key={metric.name} className={`metric-timeframe ${met ? 'met' : 'not-met'}`}>
-                                  <span className="metric-status">{met ? '✅' : '🔴'}</span>
-                                  <span>{metric.name.replace('RSI ', '')}: </span>
-                                  <strong>{metric.current !== null ? metric.current.toFixed(2) : 'N/A'}</strong>
-                                </div>
-                              );
-                            })}
-                          </div>
-                          <div className="metric-desc">Trigger met when RSI is below 30 or above 70.</div>
+              {selected.price_source !== 'live' && (
+                <div className="history-block">
+                  <div className="history-title">Recent Historical Closes</div>
+                  {!chart ? (
+                    <div className="history-empty">No historical bars available.</div>
+                  ) : (
+                    <div className="history-chart-wrap">
+                      <svg
+                        className="history-chart"
+                        viewBox={`0 0 ${chart.width} ${chart.height}`}
+                        role="img"
+                        aria-label="Historical close price chart"
+                      >
+                        <line x1="0" y1={chart.height - 16} x2={chart.width} y2={chart.height - 16} className="history-axis" />
+                        <line x1="16" y1="0" x2="16" y2={chart.height} className="history-axis" />
+                        {chart.slY !== null && (
+                          <>
+                            <line x1="16" y1={chart.slY} x2={chart.width - 8} y2={chart.slY} className="history-line-sl" />
+                            <text x={chart.width - 10} y={chart.slY - 4} textAnchor="end" className="history-line-sl-label">SL</text>
+                          </>
+                        )}
+                        {chart.tpY !== null && (
+                          <>
+                            <line x1="16" y1={chart.tpY} x2={chart.width - 8} y2={chart.tpY} className="history-line-tp" />
+                            <text x={chart.width - 10} y={chart.tpY - 4} textAnchor="end" className="history-line-tp-label">TP</text>
+                          </>
+                        )}
+                        <polyline points={chart.points} fill="none" className="history-line" />
+                      </svg>
+                      <div className="history-chart-meta">
+                        <span>{chart.firstDate} (${chart.first?.toFixed(2)})</span>
+                        <span>Low ${chart.min.toFixed(2)} · High ${chart.max.toFixed(2)}</span>
+                        <span>{chart.latestDate} (${chart.latest?.toFixed(2)})</span>
+                      </div>
+                      {(chart.buySL !== null || chart.buyTP !== null) && (
+                        <div className="history-targets-meta">
+                          {chart.buySL !== null && <span className="sl-tag">SL: ${chart.buySL.toFixed(2)}</span>}
+                          {chart.buyTP !== null && <span className="tp-tag">TP: ${chart.buyTP.toFixed(2)}</span>}
                         </div>
                       )}
-
-                      {nonRsiMetrics.map((metric) => {
-                        const met = isMetricTriggered(metric.current, metric.low_trigger, metric.high_trigger);
-                        return (
-                          <div key={metric.name} className="metric-row">
-                            <div className="metric-name">
-                              <span className="metric-status">{met ? '✅' : '🔴'}</span> {metric.name}
-                            </div>
-                            <div className="metric-values">
-                              <span>Current: <strong>{metric.current !== null ? metric.current.toFixed(2) : 'N/A'}{metric.unit === '%' ? '%' : ''}</strong></span>
-                              <span>Low trigger: {metric.low_trigger.toFixed(2)}{metric.unit === '%' ? '%' : ''}</span>
-                              <span>High trigger: {metric.high_trigger.toFixed(2)}{metric.unit === '%' ? '%' : ''}</span>
-                            </div>
-                            <div className="metric-desc">{metric.description}</div>
-                          </div>
-                        );
-                      })}
-                    </>
-                  );
-                })()}
-              </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

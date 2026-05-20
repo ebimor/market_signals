@@ -19,12 +19,14 @@ from typing import List, Optional
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import pandas as pd
+import logging
 from backend.config import settings
 from backend.trading.trade_manager import TradeManager, SignalType
 from backend.market_data.data_fetcher import get_fetcher
 from backend.signals.indicators import SignalGenerator, RSI
 
 router = APIRouter(prefix="/api/trading", tags=["Trading"])
+logger = logging.getLogger(__name__)
 
 # Global trade manager instance
 trade_manager = TradeManager()
@@ -169,6 +171,8 @@ class TickerMonitorItem(BaseModel):
     price_message: str
     last_updated: Optional[str]
     signal_metrics: List[dict] = Field(default_factory=list)
+    suggested_stop_loss: Optional[float] = None
+    suggested_take_profit: Optional[float] = None
 
 
 class HistoricalBar(BaseModel):
@@ -253,22 +257,8 @@ def _build_quote(symbol: str) -> dict:
 
     market_open = _is_regular_us_session_open()
     provider_mode = str(getattr(settings, "market_data_provider", "questrade") or "questrade").lower()
-    
-    # Try to get live Questrade data with timestamp
-    live_quote = fetcher.get_price_with_timestamp(ticker)
-    if live_quote:
-        return {
-            "symbol": ticker,
-            "price": float(live_quote["price"]),
-            "source": "live",
-            "data_provider": str(live_quote.get("provider") or "questrade"),
-            "market_open": True,
-            "message": "Live intraday price",
-            "last_updated": live_quote.get("timestamp"),
-        }
-    
-    # Fallback to current price
-    current_price = fetcher.get_current_price(ticker)
+
+    # Fetch latest historical first so we can always prefer end-of-day values when market is closed.
     data = fetcher.get_historical_data(ticker, period="7d", interval="1d", use_cache=True)
 
     latest_close = None
@@ -278,7 +268,40 @@ def _build_quote(symbol: str) -> dict:
         close_col = "Close" if "Close" in normalized.columns else None
         if close_col:
             latest_close = float(normalized[close_col].iloc[-1])
-            last_updated = normalized.index[-1].isoformat()
+            idx_value = normalized.index[-1]
+            ts = pd.to_datetime(idx_value, errors="coerce", utc=True)
+            if pd.isna(ts):
+                last_updated = str(idx_value)
+            else:
+                last_updated = ts.isoformat()
+
+    if not market_open and latest_close is not None:
+        return {
+            "symbol": ticker,
+            "price": latest_close,
+            "source": "latest_close",
+            "data_provider": "yahoo" if provider_mode == "yahoo" else provider_mode,
+            "market_open": False,
+            "message": "Market closed — showing latest close (EOD)",
+            "last_updated": last_updated,
+        }
+
+    # Try to get live Questrade data with timestamp only during market hours.
+    if market_open:
+        live_quote = fetcher.get_price_with_timestamp(ticker)
+        if live_quote:
+            return {
+                "symbol": ticker,
+                "price": float(live_quote["price"]),
+                "source": "live",
+                "data_provider": str(live_quote.get("provider") or "questrade"),
+                "market_open": True,
+                "message": "Live intraday price",
+                "last_updated": live_quote.get("timestamp"),
+            }
+
+    # Fallback to current price
+    current_price = fetcher.get_current_price(ticker)
 
     if market_open and current_price is not None:
         return {
@@ -442,8 +465,12 @@ def get_pending_signals():
     Returns list of signals with details (price, confidence, reason, etc.)
     """
     # Sync monitor BUY/SELL statuses into pending signals so review/analysis are populated.
-    overview = get_monitor_overview()
-    _sync_pending_signals_from_monitor(overview)
+    # Never fail the whole endpoint if monitor sync throws.
+    try:
+        overview = get_monitor_overview()
+        _sync_pending_signals_from_monitor(overview)
+    except Exception as exc:
+        logger.exception("Signal sync from monitor failed; returning existing pending signals: %s", exc)
 
     signals = trade_manager.get_pending_signals()
     allowed = set(trade_manager.get_monitored_tickers())
@@ -528,6 +555,8 @@ def get_monitor_overview():
         condition = "Data unavailable"
         action = "Wait for data"
         signal_metrics: List[dict] = []
+        suggested_stop_loss: Optional[float] = None
+        suggested_take_profit: Optional[float] = None
         has_quote_price = quote.get("price") is not None
 
         if has_quote_price:
@@ -637,6 +666,10 @@ def get_monitor_overview():
                     },
                 ]
 
+                base_price = quote.get("price") if quote.get("price") is not None else current_close
+                if base_price is not None and signal in {"BUY", "SELL"}:
+                    suggested_stop_loss, suggested_take_profit = _build_risk_levels(signal, float(base_price))
+
         overview.append({
             "symbol": ticker,
             "signal": signal,
@@ -650,6 +683,8 @@ def get_monitor_overview():
             "price_message": quote["message"],
             "last_updated": quote["last_updated"],
             "signal_metrics": signal_metrics,
+            "suggested_stop_loss": suggested_stop_loss,
+            "suggested_take_profit": suggested_take_profit,
         })
 
     return overview
@@ -676,8 +711,10 @@ def get_monitor_history(
     trimmed = normalized.tail(max(1, min(limit, 500)))
     bars = []
     for idx, row in trimmed.iterrows():
+        ts = pd.to_datetime(idx, errors="coerce", utc=True)
+        timestamp = ts.isoformat() if not pd.isna(ts) else str(idx)
         bars.append({
-            "timestamp": idx.isoformat(),
+            "timestamp": timestamp,
             "open": float(row["Open"]),
             "high": float(row["High"]),
             "low": float(row["Low"]),

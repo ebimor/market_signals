@@ -15,18 +15,26 @@ export function useTrading() {
     if (!silent) setLoading(true);
     setError(null);
     try {
-      const [s, o, h, st, st2] = await Promise.all([
+      const [s, o, h, st, st2] = await Promise.allSettled([
         api.getSignals(),
         api.getOpenTrades(),
         api.getTradeHistory(),
         api.getStats(),
         api.getStatus()
       ]);
-      setSignals(s);
-      setOpenTrades(o);
-      setTradeHistory(h);
-      setStats(st);
-      setStatus(st2);
+
+      if (s.status === 'fulfilled') setSignals(s.value);
+      if (o.status === 'fulfilled') setOpenTrades(o.value);
+      if (h.status === 'fulfilled') setTradeHistory(h.value);
+      if (st.status === 'fulfilled') setStats(st.value);
+      if (st2.status === 'fulfilled') setStatus(st2.value);
+
+      const failures = [s, o, h, st, st2].filter(r => r.status === 'rejected') as PromiseRejectedResult[];
+      if (failures.length > 0) {
+        const firstReason = failures[0]?.reason;
+        const message = firstReason instanceof Error ? firstReason.message : String(firstReason ?? 'Unknown error');
+        setError(`Some data failed to load (${failures.length}/5): ${message}`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
