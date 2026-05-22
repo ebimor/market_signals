@@ -182,6 +182,31 @@ class MarketDataFetcher:
                 logger.warning(f"Could not load cache file {p.name} for {ticker} ({interval}): {e}")
 
         return None
+
+    def _load_recent_disk_cache(self, ticker: str, interval: str, max_age_minutes: int) -> Optional[pd.DataFrame]:
+        """Load disk cache only if the file is recent enough to avoid unnecessary provider calls."""
+        path = self._cache_file_path(ticker, interval)
+        safe_ticker = ticker.upper().replace("^", "IDX_")
+        legacy_path = self.cache_dir / f"{safe_ticker}.csv"
+        candidate_paths = [path, legacy_path]
+        max_age = timedelta(minutes=max_age_minutes)
+
+        for p in candidate_paths:
+            if not p.exists():
+                continue
+            try:
+                modified_at = datetime.fromtimestamp(p.stat().st_mtime)
+                if datetime.now() - modified_at > max_age:
+                    continue
+                data = pd.read_csv(p, index_col=0, parse_dates=True)
+                data.columns = [str(col).lower() for col in data.columns]
+                if not data.empty:
+                    logger.debug(f"Using recent disk cache for {ticker} ({interval}) from {p.name}")
+                    return data
+            except Exception as e:
+                logger.warning(f"Could not load recent cache file {p.name} for {ticker} ({interval}): {e}")
+
+        return None
     
     def _is_cache_valid(self, cache_time: datetime) -> bool:
         """Check if cached data is still valid"""
@@ -254,6 +279,16 @@ class MarketDataFetcher:
             if self._is_cache_valid(cache_time):
                 logger.debug(f"Using cached data for {ticker}")
                 return data.copy()
+
+        if use_cache and interval in {"1d", "1wk"}:
+            recent_disk_data = self._load_recent_disk_cache(
+                ticker,
+                interval,
+                max_age_minutes=30 if interval == "1d" else 180,
+            )
+            if recent_disk_data is not None:
+                self._cache[cache_key] = (recent_disk_data.copy(), datetime.now())
+                return recent_disk_data.copy()
         
         try:
             logger.info(f"Fetching {period} data for {ticker} at {interval} interval")

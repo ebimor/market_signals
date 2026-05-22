@@ -4,6 +4,12 @@ import '../styles/TickerMonitor.css';
 
 export const TickerMonitor: React.FC = () => {
   type SortMode = 'signal_then_conf_desc' | 'conf_desc_then_signal' | 'signal_only' | 'confidence_only';
+  type CachedHistoryEntry = {
+    bars: HistoricalBar[];
+    fetchedAt: number;
+  };
+
+  const HISTORY_CACHE_TTL_MS = 10 * 60 * 1000;
 
   const [tickersInput, setTickersInput] = useState('');
   const [draftTickers, setDraftTickers] = useState('');
@@ -16,6 +22,7 @@ export const TickerMonitor: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoricalBar[]>([]);
+  const [historyCache, setHistoryCache] = useState<Record<string, CachedHistoryEntry>>({});
   const [refreshingTicker, setRefreshingTicker] = useState<string | null>(null);
   const [refreshingAll, setRefreshingAll] = useState(false);
 
@@ -119,6 +126,26 @@ export const TickerMonitor: React.FC = () => {
     return sorted;
   }, [items, sortMode]);
 
+  const loadHistoryForSymbol = async (symbol: string, options?: { force?: boolean }) => {
+    const force = options?.force ?? false;
+    const cached = historyCache[symbol];
+    if (!force && cached && (Date.now() - cached.fetchedAt) < HISTORY_CACHE_TTL_MS) {
+      setHistory(cached.bars);
+      return;
+    }
+
+    const resp = await api.getMonitorHistory(symbol, '1d', '6mo', 120);
+    const bars = resp.bars ?? [];
+    setHistory(bars);
+    setHistoryCache((prev) => ({
+      ...prev,
+      [symbol]: {
+        bars,
+        fetchedAt: Date.now(),
+      },
+    }));
+  };
+
   useEffect(() => {
     if (!selected?.symbol) {
       setHistory([]);
@@ -126,16 +153,13 @@ export const TickerMonitor: React.FC = () => {
     }
 
     let canceled = false;
-    api.getMonitorHistory(selected.symbol, '1d', '6mo', 120)
-      .then((resp) => {
-        if (!canceled) setHistory(resp.bars ?? []);
-      })
+    loadHistoryForSymbol(selected.symbol)
       .catch(() => {
         if (!canceled) setHistory([]);
       });
 
     return () => { canceled = true; };
-  }, [selected?.symbol]);
+  }, [selected?.symbol, historyCache]);
 
   const handleSave = async () => {
     const tickers = draftTickers
@@ -182,8 +206,7 @@ export const TickerMonitor: React.FC = () => {
     try {
       await loadAll({ silent: true });
       if (selectedSymbol) {
-        const resp = await api.getMonitorHistory(selectedSymbol, '1d', '6mo', 120);
-        setHistory(resp.bars ?? []);
+        await loadHistoryForSymbol(selectedSymbol, { force: true });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to refresh all tickers');
@@ -199,8 +222,7 @@ export const TickerMonitor: React.FC = () => {
       try {
         await loadAll({ silent: true });
         if (selectedSymbol) {
-          const resp = await api.getMonitorHistory(selectedSymbol, '1d', '6mo', 120);
-          setHistory(resp.bars ?? []);
+          await loadHistoryForSymbol(selectedSymbol);
         }
       } catch {
         // keep existing UI state on background auto-refresh errors
@@ -227,8 +249,15 @@ export const TickerMonitor: React.FC = () => {
     return 'Unavailable';
   };
 
-  const isMetricTriggered = (current: number | null, low: number, high: number) => {
+  const isMetricTriggered = (
+    current: number | null,
+    low: number,
+    high: number,
+    triggerMode: 'outside_range' | 'max_value' | 'min_value' = 'outside_range'
+  ) => {
     if (current === null) return false;
+    if (triggerMode === 'max_value') return current <= high;
+    if (triggerMode === 'min_value') return current >= low;
     return current <= low || current >= high;
   };
 
@@ -241,6 +270,67 @@ export const TickerMonitor: React.FC = () => {
       .filter((x) => Number.isFinite(x.t) && Number.isFinite(x.close))
       .sort((a, b) => a.t - b.t);
   }, [history]);
+
+  const rsiSeries = useMemo(() => {
+    if (historySeries.length < 15) return [] as Array<{ t: number; value: number; index: number }>;
+
+    const closes = historySeries.map((point) => point.close);
+    const period = 14;
+    const points: Array<{ t: number; value: number; index: number }> = [];
+
+    let gainSum = 0;
+    let lossSum = 0;
+    for (let i = 1; i <= period; i += 1) {
+      const delta = closes[i] - closes[i - 1];
+      if (delta >= 0) gainSum += delta;
+      else lossSum += Math.abs(delta);
+    }
+
+    let avgGain = gainSum / period;
+    let avgLoss = lossSum / period;
+    const firstRsi = avgLoss === 0 ? 100 : 100 - (100 / (1 + (avgGain / avgLoss)));
+    points.push({ t: historySeries[period].t, value: firstRsi, index: period });
+
+    for (let i = period + 1; i < closes.length; i += 1) {
+      const delta = closes[i] - closes[i - 1];
+      const gain = delta > 0 ? delta : 0;
+      const loss = delta < 0 ? Math.abs(delta) : 0;
+      avgGain = ((avgGain * (period - 1)) + gain) / period;
+      avgLoss = ((avgLoss * (period - 1)) + loss) / period;
+      const rsi = avgLoss === 0 ? 100 : 100 - (100 / (1 + (avgGain / avgLoss)));
+      points.push({ t: historySeries[i].t, value: rsi, index: i });
+    }
+
+    return points;
+  }, [historySeries]);
+
+  const rsiChart = useMemo(() => {
+    if (rsiSeries.length < 2) return null;
+
+    const width = 680;
+    const height = 108;
+    const pad = 12;
+    const min = 0;
+    const max = 100;
+    const range = max - min;
+
+    const xFor = (i: number) => pad + (i / Math.max(historySeries.length - 1, 1)) * (width - pad * 2);
+    const yFor = (v: number) => height - pad - ((v - min) / range) * (height - pad * 2);
+
+    const points = rsiSeries.map((p) => `${xFor(p.index)},${yFor(p.value)}`).join(' ');
+    const latest = rsiSeries[rsiSeries.length - 1]?.value ?? null;
+
+    return {
+      width,
+      height,
+      pad,
+      points,
+      latest,
+      overboughtY: yFor(70),
+      oversoldY: yFor(30),
+      midY: yFor(50),
+    };
+  }, [historySeries.length, rsiSeries]);
 
   const chart = useMemo(() => {
     if (historySeries.length < 2) return null;
@@ -554,7 +644,7 @@ export const TickerMonitor: React.FC = () => {
                             <div className="metric-name">RSI Timeframes</div>
                             <div className="metric-timeframes">
                               {rsiMetrics.map((metric) => {
-                                const met = isMetricTriggered(metric.current, metric.low_trigger, metric.high_trigger);
+                                const met = isMetricTriggered(metric.current, metric.low_trigger, metric.high_trigger, metric.trigger_mode);
                                 return (
                                   <div key={metric.name} className={`metric-timeframe ${met ? 'met' : 'not-met'}`}>
                                     <span className="metric-status">{met ? '✅' : '🔴'}</span>
@@ -569,7 +659,8 @@ export const TickerMonitor: React.FC = () => {
                         )}
 
                         {nonRsiMetrics.map((metric) => {
-                          const met = isMetricTriggered(metric.current, metric.low_trigger, metric.high_trigger);
+                          const met = isMetricTriggered(metric.current, metric.low_trigger, metric.high_trigger, metric.trigger_mode);
+                          const dailyChange = metric.daily_change_pct;
                           return (
                             <div key={metric.name} className="metric-row">
                               <div className="metric-name">
@@ -579,6 +670,13 @@ export const TickerMonitor: React.FC = () => {
                                 <span>Current: <strong>{metric.current !== null ? metric.current.toFixed(2) : 'N/A'}{metric.unit === '%' ? '%' : ''}</strong></span>
                                 <span>Low trigger: {metric.low_trigger.toFixed(2)}{metric.unit === '%' ? '%' : ''}</span>
                                 <span>High trigger: {metric.high_trigger.toFixed(2)}{metric.unit === '%' ? '%' : ''}</span>
+                                {dailyChange !== undefined && dailyChange !== null && (
+                                  <span>
+                                    Daily change: <strong className={`metric-change ${dailyChange >= 0 ? 'positive' : 'negative'}`}>
+                                      {dailyChange >= 0 ? '+' : ''}{dailyChange.toFixed(1)}%
+                                    </strong>
+                                  </span>
+                                )}
                               </div>
                               <div className="metric-desc">{metric.description}</div>
                             </div>
@@ -597,14 +695,20 @@ export const TickerMonitor: React.FC = () => {
                 <div className="history-empty">No historical bars available.</div>
               ) : (
                 <div className="history-chart-wrap">
+                  {(() => {
+                    const rsiGap = rsiChart ? 24 : 0;
+                    const totalHeight = chart.height + (rsiChart ? rsiChart.height + rsiGap : 0);
+                    const rsiOffsetY = chart.height + rsiGap;
+
+                    return (
                   <svg
                     className="history-chart"
-                    viewBox={`0 0 ${chart.width} ${chart.height}`}
+                    viewBox={`0 0 ${chart.width} ${totalHeight}`}
                     role="img"
-                    aria-label="Historical close price chart"
+                    aria-label="Historical close and RSI chart"
                   >
+                    <line x1="16" y1="0" x2="16" y2={totalHeight} className="history-axis" />
                     <line x1="0" y1={chart.height - 16} x2={chart.width} y2={chart.height - 16} className="history-axis" />
-                    <line x1="16" y1="0" x2="16" y2={chart.height} className="history-axis" />
                     {chart.slY !== null && (
                       <>
                         <line x1="16" y1={chart.slY} x2={chart.width - 8} y2={chart.slY} className="history-line-sl" />
@@ -636,7 +740,22 @@ export const TickerMonitor: React.FC = () => {
                       <polyline points={chart.bbLowerPoints} fill="none" className="history-line-bb-lower" />
                     )}
                     <polyline points={chart.points} fill="none" className="history-line" />
+                    {rsiChart && (
+                      <>
+                        <text x={chart.width / 2} y={chart.height + 12} textAnchor="middle" className="rsi-subchart-label">
+                          Daily RSI (14)
+                        </text>
+                        <g transform={`translate(0 ${rsiOffsetY})`}>
+                          <line x1="0" y1={rsiChart.overboughtY} x2={chart.width} y2={rsiChart.overboughtY} className="rsi-guide overbought" />
+                          <line x1="0" y1={rsiChart.midY} x2={chart.width} y2={rsiChart.midY} className="rsi-guide mid" />
+                          <line x1="0" y1={rsiChart.oversoldY} x2={chart.width} y2={rsiChart.oversoldY} className="rsi-guide oversold" />
+                          <polyline points={rsiChart.points} fill="none" className="rsi-line" />
+                        </g>
+                      </>
+                    )}
                   </svg>
+                    );
+                  })()}
                   <div className="history-chart-meta">
                     <span>{chart.firstDate} (${chart.first?.toFixed(2)})</span>
                     <span>Low ${chart.min.toFixed(2)} · High ${chart.max.toFixed(2)}</span>
@@ -657,6 +776,13 @@ export const TickerMonitor: React.FC = () => {
                     <div className="history-targets-meta">
                       {chart.buySL !== null && <span className="sl-tag">SL: ${chart.buySL.toFixed(2)}</span>}
                       {chart.buyTP !== null && <span className="tp-tag">TP: ${chart.buyTP.toFixed(2)}</span>}
+                    </div>
+                  )}
+                  {rsiChart && (
+                    <div className="rsi-meta">
+                      <span className={`rsi-tag ${rsiChart.latest !== null && rsiChart.latest >= 70 ? 'overbought' : rsiChart.latest !== null && rsiChart.latest <= 30 ? 'oversold' : 'neutral'}`}>
+                        RSI14: {rsiChart.latest !== null ? rsiChart.latest.toFixed(2) : 'N/A'}
+                      </span>
                     </div>
                   )}
                 </div>

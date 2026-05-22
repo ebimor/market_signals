@@ -95,6 +95,8 @@ export interface SignalMetric {
   low_trigger: number;
   high_trigger: number;
   unit: string;
+  trigger_mode?: 'outside_range' | 'max_value' | 'min_value';
+  daily_change_pct?: number | null;
   description: string;
 }
 

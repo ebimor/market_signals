@@ -105,8 +105,6 @@ class SignalResponse(BaseModel):
 
 
 class TradeResponse(BaseModel):
-    """Trade record response"""
-    trade_id: str
     symbol: str
     entry_price: float
     entry_date: str
@@ -226,7 +224,15 @@ def _calculate_rsi_timeframe(
         return None
 
     close = normalized["Close"].copy()
-    close.index = pd.to_datetime(close.index, utc=True)
+    # Parse datetime index flexibly - handle both naive and timezone-aware
+    try:
+        close.index = pd.to_datetime(close.index, format='mixed', utc=False)
+    except:
+        try:
+            close.index = pd.to_datetime(close.index, utc=True)
+        except:
+            close.index = pd.to_datetime(close.index)
+    
     close = close.sort_index()
 
     if resample_rule:
@@ -395,19 +401,33 @@ def _compute_market_regime(fetcher) -> dict:
             if fallback_vix is not None:
                 vix_value = float(fallback_vix)
         
-        # Calculate VIX change vs previous close
+        # Calculate VIX change versus previous real close.
         try:
-            vix_hist = fetcher.get_historical_data("VIXW.IN", period="5d", interval="1d", use_cache=False)
+            vix_hist = fetcher.get_historical_data("VIXW.IN", period="1mo", interval="1d")
+            if vix_hist is None or vix_hist.empty:
+                vix_hist = fetcher.get_historical_data("^VIX", period="1mo", interval="1d")
+            
             if vix_hist is not None and not vix_hist.empty and len(vix_hist) >= 2:
                 vix_norm = _normalize_ohlcv_columns(vix_hist)
                 if "Close" in vix_norm.columns:
-                    closes = vix_norm["Close"].values
-                    current = closes[-1]  # Today
-                    previous = closes[-2]  # Yesterday
-                    if previous != 0:
-                        vix_change_pct = float(((current - previous) / previous) * 100)
-        except Exception:
-            pass  # VIX change is optional, don't block on it
+                    vix_norm = vix_norm.sort_index()
+                    closes = vix_norm["Close"].dropna()
+                    if len(closes) >= 2:
+                        latest_close = float(closes.iloc[-1])
+                        previous_close = float(closes.iloc[-2])
+
+                        reference_close = latest_close
+                        if len(closes.index) >= 2:
+                            latest_date = pd.to_datetime(closes.index[-1]).date()
+                            today_date = datetime.now().date()
+                            if latest_date >= today_date:
+                                reference_close = previous_close
+
+                        current_for_change = float(vix_value) if vix_value is not None else latest_close
+                        if reference_close != 0:
+                            vix_change_pct = float(((current_for_change - reference_close) / reference_close) * 100)
+        except Exception as exc:
+            logger.warning("VIX change calculation failed: %s", exc)
     except Exception as exc:
         logger.warning("VIX Questrade check failed: %s", exc)
 
@@ -723,6 +743,7 @@ def get_monitor_overview():
                         "low_trigger": 30.0,
                         "high_trigger": 70.0,
                         "unit": "index",
+                        "trigger_mode": "outside_range",
                         "description": "BUY below 30, SELL above 70",
                     },
                     {
@@ -731,6 +752,7 @@ def get_monitor_overview():
                         "low_trigger": 30.0,
                         "high_trigger": 70.0,
                         "unit": "index",
+                        "trigger_mode": "outside_range",
                         "description": "BUY below 30, SELL above 70",
                     },
                     {
@@ -739,6 +761,7 @@ def get_monitor_overview():
                         "low_trigger": 30.0,
                         "high_trigger": 70.0,
                         "unit": "index",
+                        "trigger_mode": "outside_range",
                         "description": "BUY below 30, SELL above 70",
                     },
                     {
@@ -747,6 +770,7 @@ def get_monitor_overview():
                         "low_trigger": 30.0,
                         "high_trigger": 70.0,
                         "unit": "index",
+                        "trigger_mode": "outside_range",
                         "description": "RSI used by current composite signal",
                     },
                     {
@@ -755,6 +779,7 @@ def get_monitor_overview():
                         "low_trigger": -0.0001,
                         "high_trigger": 0.0001,
                         "unit": "value",
+                        "trigger_mode": "outside_range",
                         "description": "BUY above 0, SELL below 0",
                     },
                     {
@@ -763,6 +788,7 @@ def get_monitor_overview():
                         "low_trigger": -2.0,
                         "high_trigger": 2.0,
                         "unit": "%",
+                        "trigger_mode": "outside_range",
                         "description": "BUY above +2%, SELL below -2%",
                     },
                     {
@@ -771,6 +797,7 @@ def get_monitor_overview():
                         "low_trigger": 20.0,
                         "high_trigger": 80.0,
                         "unit": "%",
+                        "trigger_mode": "outside_range",
                         "description": "BUY below 20%, SELL above 80%",
                     },
                     {
@@ -779,6 +806,7 @@ def get_monitor_overview():
                         "low_trigger": max_atr_pct,
                         "high_trigger": 999.0,
                         "unit": "%",
+                        "trigger_mode": "max_value",
                         "description": f"Regime filter target: ATR% should be ≤ {max_atr_pct} for BUY",
                     },
                     {
@@ -787,8 +815,9 @@ def get_monitor_overview():
                         "low_trigger": 0.0,
                         "high_trigger": float(regime.get("vix_threshold") or 30.0),
                         "unit": "index",
-                        "description": f"Regime filter: VIX should be ≤ {float(regime.get('vix_threshold') or 30.0)}" + 
-                            (f" (daily change: {regime.get('vix_change_pct', 0):+.1f}%)" if regime.get("vix_change_pct") is not None else ""),
+                        "trigger_mode": "max_value",
+                        "daily_change_pct": float(regime.get("vix_change_pct")) if regime.get("vix_change_pct") is not None else None,
+                        "description": f"Regime filter: VIX should be ≤ {float(regime.get('vix_threshold') or 30.0)}",
                     },
                 ]
 

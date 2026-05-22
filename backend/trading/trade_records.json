@@ -10,7 +10,8 @@
     "META",
     "AMZN",
     "VISA",
-    "MA"
+    "MA",
+    "RY.TO"
   ],
   "executed_trades": [
     {
@@ -116,5 +117,5 @@
       "notes": "Manual entry"
     }
   ],
-  "saved_at": "2026-05-20T14:20:41.116765"
+  "saved_at": "2026-05-22T11:46:32.866734"
 }
