@@ -170,6 +170,8 @@ class TickerMonitorItem(BaseModel):
     market_open: bool
     price_message: str
     last_updated: Optional[str]
+    price_change: Optional[float] = None
+    price_change_pct: Optional[float] = None
     signal_metrics: List[dict] = Field(default_factory=list)
     suggested_stop_loss: Optional[float] = None
     suggested_take_profit: Optional[float] = None
@@ -364,6 +366,7 @@ def _compute_market_regime(fetcher) -> dict:
     """Compute market regime context from SPY trend, VIX, and macro-event toggle."""
     spy_trend_positive = None
     vix_value = None
+    vix_change_pct = None
 
     try:
         spy_data = fetcher.get_historical_data("SPY", period="6mo", interval="1d", use_cache=True)
@@ -391,6 +394,20 @@ def _compute_market_regime(fetcher) -> dict:
             fallback_vix = fetcher.get_current_price("VIXW.IN")
             if fallback_vix is not None:
                 vix_value = float(fallback_vix)
+        
+        # Calculate VIX change vs previous close
+        try:
+            vix_hist = fetcher.get_historical_data("VIXW.IN", period="5d", interval="1d", use_cache=False)
+            if vix_hist is not None and not vix_hist.empty and len(vix_hist) >= 2:
+                vix_norm = _normalize_ohlcv_columns(vix_hist)
+                if "Close" in vix_norm.columns:
+                    closes = vix_norm["Close"].values
+                    current = closes[-1]  # Today
+                    previous = closes[-2]  # Yesterday
+                    if previous != 0:
+                        vix_change_pct = float(((current - previous) / previous) * 100)
+        except Exception:
+            pass  # VIX change is optional, don't block on it
     except Exception as exc:
         logger.warning("VIX Questrade check failed: %s", exc)
 
@@ -402,6 +419,7 @@ def _compute_market_regime(fetcher) -> dict:
     return {
         "spy_trend_positive": spy_trend_positive,
         "vix_value": vix_value,
+        "vix_change_pct": vix_change_pct,
         "vix_threshold": vix_threshold,
         "vix_acceptable": vix_acceptable,
         "no_major_macro_event": no_major_macro_event,
@@ -606,6 +624,8 @@ def get_monitor_overview():
         signal_metrics: List[dict] = []
         suggested_stop_loss: Optional[float] = None
         suggested_take_profit: Optional[float] = None
+        price_change: Optional[float] = None
+        price_change_pct: Optional[float] = None
         has_quote_price = quote.get("price") is not None
 
         if has_quote_price:
@@ -620,6 +640,14 @@ def get_monitor_overview():
         if data is not None and not data.empty:
             normalized = _normalize_ohlcv_columns(data)
             if all(col in normalized.columns for col in ["Open", "High", "Low", "Close", "Volume"]):
+                # Calculate daily change (vs yesterday close)
+                if len(normalized) >= 2:
+                    current_price = float(normalized["Close"].iloc[-1])
+                    yesterday_price = float(normalized["Close"].iloc[-2])
+                    price_change = current_price - yesterday_price
+                    if yesterday_price != 0:
+                        price_change_pct = (price_change / yesterday_price) * 100
+                
                 signal_data = generator.generate_signal(normalized)
                 signal = str(signal_data.get("signal", "HOLD"))
                 confidence = float(signal_data.get("confidence", 0.0))
@@ -759,7 +787,8 @@ def get_monitor_overview():
                         "low_trigger": 0.0,
                         "high_trigger": float(regime.get("vix_threshold") or 30.0),
                         "unit": "index",
-                        "description": f"Regime filter: VIX should be ≤ {float(regime.get('vix_threshold') or 30.0)}",
+                        "description": f"Regime filter: VIX should be ≤ {float(regime.get('vix_threshold') or 30.0)}" + 
+                            (f" (daily change: {regime.get('vix_change_pct', 0):+.1f}%)" if regime.get("vix_change_pct") is not None else ""),
                     },
                 ]
 
@@ -779,6 +808,8 @@ def get_monitor_overview():
             "market_open": quote["market_open"],
             "price_message": quote["message"],
             "last_updated": quote["last_updated"],
+            "price_change": round(price_change, 2) if price_change is not None else None,
+            "price_change_pct": round(price_change_pct, 2) if price_change_pct is not None else None,
             "signal_metrics": signal_metrics,
             "suggested_stop_loss": suggested_stop_loss,
             "suggested_take_profit": suggested_take_profit,

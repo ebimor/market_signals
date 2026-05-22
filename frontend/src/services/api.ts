@@ -82,6 +82,8 @@ export interface MonitorItem {
   market_open: boolean;
   price_message: string;
   last_updated: string | null;
+  price_change: number | null;
+  price_change_pct: number | null;
   signal_metrics: SignalMetric[];
   suggested_stop_loss?: number | null;
   suggested_take_profit?: number | null;

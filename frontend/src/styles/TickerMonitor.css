@@ -320,6 +320,20 @@
   color: #92400e;
 }
 
+.ticker-change {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-top: 0.3rem;
+}
+
+.ticker-change.positive {
+  color: #16a34a;
+}
+
+.ticker-change.negative {
+  color: #dc2626;
+}
+
 .ticker-confidence {
   font-size: 0.82rem;
   color: #6b7280;

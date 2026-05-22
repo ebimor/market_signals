@@ -1,5 +1,24 @@
 # Market Data Collector - Implementation Summary
 
+## Quick Overview (for sharing)
+
+SafeSwing Trader is a full-stack trading assistant that monitors selected tickers, computes technical signals, applies market-regime risk filters, and presents actionable trade context in a live dashboard.
+
+### Core capabilities
+- Live + historical market data collection (Questrade-first, Yahoo fallback in supported flows)
+- Multi-indicator signal engine (RSI, MACD, EMA distance, Bollinger position, ATR%)
+- Market-regime guardrails for BUY decisions (SPY trend, VIX threshold, macro-event toggle, ATR volatility gate)
+- Trade lifecycle support (signal review, approval/rejection, execution, close, history)
+- Monitor UI with confidence sorting, auto-refresh, risk overlays (SL/TP), and chart overlays (MA/Bollinger)
+
+### Languages and implementation methods
+- **Backend:** Python, FastAPI, Pydantic settings, SQLAlchemy ORM
+- **Frontend:** React + TypeScript (Vite)
+- **Data/analytics:** pandas + indicator pipelines for OHLCV calculations
+- **Reliability methods:** API response hardening, caching, provider fallback, and defensive error handling
+
+This architecture keeps decision logic transparent, configurable, and suitable for incremental strategy refinement.
+
 ## ✅ Completed Features
 
 ### 1. **Data Source: Yahoo Finance (Free)**

@@ -490,8 +490,12 @@ export const TickerMonitor: React.FC = () => {
                   {item.price_source === 'live' && <span className="price-badge">LIVE</span>}
                 </div>
               )}
+              {item.price_change_pct !== null && (
+                <div className={`ticker-change ${item.price_change_pct >= 0 ? 'positive' : 'negative'}`}>
+                  {item.price_change_pct >= 0 ? '+' : ''}{item.price_change_pct.toFixed(2)}% ({item.price_change !== null ? (item.price_change >= 0 ? '+' : '') + item.price_change.toFixed(2) : 'N/A'})
+                </div>
+              )}
               <div className="ticker-confidence">Confidence: {item.confidence.toFixed(0)}%</div>
-              <div className="ticker-source">Source: {sourceLabel(item.price_source, item.data_provider)}</div>
               <button 
                 onClick={(e) => {
                   e.stopPropagation();
