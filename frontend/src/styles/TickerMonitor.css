@@ -396,6 +396,35 @@
   color: #111827;
 }
 
+.drawdown-badge {
+  margin: 0.1rem 0 0.4rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.drawdown-badge .drawdown-arrow {
+  font-size: 0.9rem;
+}
+
+.drawdown-badge strong {
+  font-weight: 800;
+}
+
+.drawdown-badge.down {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.drawdown-badge.at-high {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #15803d;
+}
+
 .metrics-history-layout {
   margin-top: 0.9rem;
   border-top: 1px solid #e5e7eb;
@@ -653,6 +682,46 @@
 .rsi-tag.oversold {
   background: #dcfce7;
   color: #166534;
+}
+
+.rsi-timeframes {
+  margin-top: 0.85rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.rsi-timeframe-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem 0.4rem;
+  background: #ffffff;
+}
+
+.rsi-timeframe-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #374151;
+  margin-bottom: 0.3rem;
+}
+
+.rsi-timeframe-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.rsi-timeframe-empty {
+  font-size: 0.8rem;
+  color: #9ca3af;
+  padding: 1.2rem 0.4rem;
+  text-align: center;
+}
+
+@media (max-width: 700px) {
+  .rsi-timeframes {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 700px) {

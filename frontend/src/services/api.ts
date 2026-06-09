@@ -116,6 +116,32 @@ export interface TickerHistory {
   source: string;
 }
 
+export interface RsiSeriesPoint {
+  timestamp: string;
+  value: number;
+}
+
+export interface RsiTimeframeSeries {
+  interval: string;
+  points: RsiSeriesPoint[];
+  latest: number | null;
+}
+
+export interface DrawdownInfo {
+  all_time_high: number | null;
+  all_time_high_date: string | null;
+  current: number | null;
+  drawdown_pct: number | null;
+  is_down: boolean;
+}
+
+export interface TickerAnalysis {
+  symbol: string;
+  rsi_4h: RsiTimeframeSeries;
+  rsi_weekly: RsiTimeframeSeries;
+  drawdown: DrawdownInfo;
+}
+
 export interface PerformanceStats {
   total_trades: number;
   winning_trades: number;
@@ -273,5 +299,10 @@ export const api = {
   async getMonitorHistory(symbol: string, interval = '1d', period = '6mo', limit = 120): Promise<TickerHistory> {
     const res = await fetch(`${API_BASE}/monitor/history/${symbol}?interval=${interval}&period=${period}&limit=${limit}`);
     return parseResponse<TickerHistory>(res);
+  },
+
+  async getMonitorAnalysis(symbol: string): Promise<TickerAnalysis> {
+    const res = await fetch(`${API_BASE}/monitor/analysis/${symbol}`);
+    return parseResponse<TickerAnalysis>(res);
   }
 };

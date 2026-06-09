@@ -193,6 +193,36 @@ class TickerHistoryResponse(BaseModel):
     source: str
 
 
+class RsiSeriesPoint(BaseModel):
+    """Single RSI(14) value at a point in time"""
+    timestamp: str
+    value: float
+
+
+class RsiTimeframeSeries(BaseModel):
+    """RSI(14) series for one timeframe (e.g. 4-hour or weekly)"""
+    interval: str
+    points: List[RsiSeriesPoint] = Field(default_factory=list)
+    latest: Optional[float] = None
+
+
+class DrawdownInfo(BaseModel):
+    """Drawdown of the latest price versus the all-time high"""
+    all_time_high: Optional[float] = None
+    all_time_high_date: Optional[str] = None
+    current: Optional[float] = None
+    drawdown_pct: Optional[float] = None
+    is_down: bool = False
+
+
+class TickerAnalysisResponse(BaseModel):
+    """Multi-timeframe RSI series plus drawdown-from-all-time-high"""
+    symbol: str
+    rsi_4h: RsiTimeframeSeries
+    rsi_weekly: RsiTimeframeSeries
+    drawdown: DrawdownInfo
+
+
 def _normalize_ohlcv_columns(data: pd.DataFrame) -> pd.DataFrame:
     """Normalize OHLCV column names to title case for indicator engines."""
     renamed = data.copy()
@@ -207,21 +237,24 @@ def _normalize_ohlcv_columns(data: pd.DataFrame) -> pd.DataFrame:
     return renamed
 
 
-def _calculate_rsi_timeframe(
+def _rsi_series_for_timeframe(
     fetcher,
     ticker: str,
     period: str,
     interval: str,
     resample_rule: Optional[str] = None,
-) -> Optional[float]:
-    """Calculate RSI(14) for a specific timeframe."""
+) -> pd.Series:
+    """Return the RSI(14) Series (indexed by datetime) for a timeframe.
+
+    Returns an empty Series when data is unavailable or insufficient.
+    """
     data = fetcher.get_historical_data(ticker, period=period, interval=interval, use_cache=True)
     if data is None or data.empty:
-        return None
+        return pd.Series(dtype=float)
 
     normalized = _normalize_ohlcv_columns(data)
     if "Close" not in normalized.columns:
-        return None
+        return pd.Series(dtype=float)
 
     close = normalized["Close"].copy()
     # Parse datetime index flexibly - handle both naive and timezone-aware
@@ -239,14 +272,85 @@ def _calculate_rsi_timeframe(
         close = close.resample(resample_rule).last().dropna()
 
     if len(close) < 15:
-        return None
+        return pd.Series(dtype=float)
 
     rsi_values = RSI(period=14).calculate(close)
-    rsi_values = rsi_values.dropna()
+    return rsi_values.dropna()
+
+
+def _calculate_rsi_timeframe(
+    fetcher,
+    ticker: str,
+    period: str,
+    interval: str,
+    resample_rule: Optional[str] = None,
+) -> Optional[float]:
+    """Calculate the latest RSI(14) value for a specific timeframe."""
+    rsi_values = _rsi_series_for_timeframe(fetcher, ticker, period, interval, resample_rule)
     if rsi_values.empty:
         return None
-
     return float(round(float(rsi_values.iloc[-1]), 2))
+
+
+def _rsi_series_points(rsi_values: pd.Series, limit: int = 120) -> List[dict]:
+    """Convert an RSI Series into a list of {timestamp, value} (last `limit`)."""
+    if rsi_values is None or rsi_values.empty:
+        return []
+    trimmed = rsi_values.tail(max(1, limit))
+    points: List[dict] = []
+    for idx, val in trimmed.items():
+        if pd.isna(val):
+            continue
+        ts = pd.to_datetime(idx, errors="coerce", utc=True)
+        timestamp = ts.isoformat() if not pd.isna(ts) else str(idx)
+        points.append({"timestamp": timestamp, "value": float(round(float(val), 2))})
+    return points
+
+
+def _calculate_drawdown(fetcher, ticker: str) -> dict:
+    """Compute the latest drawdown versus the all-time high.
+
+    Uses the longest weekly history available (falls back to disk cache when
+    live data is unavailable). The all-time high is the maximum weekly high.
+    """
+    result = {
+        "all_time_high": None,
+        "all_time_high_date": None,
+        "current": None,
+        "drawdown_pct": None,
+        "is_down": False,
+    }
+
+    data = fetcher.get_historical_data(ticker, period="max", interval="1wk", use_cache=True)
+    if data is None or data.empty:
+        data = fetcher.get_historical_data(ticker, period="5y", interval="1wk", use_cache=True)
+    if data is None or data.empty:
+        return result
+
+    normalized = _normalize_ohlcv_columns(data)
+    high_col = "High" if "High" in normalized.columns else ("Close" if "Close" in normalized.columns else None)
+    if high_col is None or "Close" not in normalized.columns:
+        return result
+
+    highs = pd.to_numeric(normalized[high_col], errors="coerce").dropna()
+    closes = pd.to_numeric(normalized["Close"], errors="coerce").dropna()
+    if highs.empty or closes.empty:
+        return result
+
+    ath = float(highs.max())
+    ath_idx = highs.idxmax()
+    ath_ts = pd.to_datetime(ath_idx, errors="coerce", utc=True)
+    current = float(closes.iloc[-1])
+    drawdown_pct = ((current - ath) / ath * 100.0) if ath else 0.0
+
+    result.update(
+        all_time_high=round(ath, 2),
+        all_time_high_date=ath_ts.date().isoformat() if not pd.isna(ath_ts) else None,
+        current=round(current, 2),
+        drawdown_pct=round(drawdown_pct, 2),
+        is_down=current < ath,
+    )
+    return result
 
 
 def _is_regular_us_session_open() -> bool:
@@ -884,6 +988,43 @@ def get_monitor_history(
         "interval": interval,
         "bars": bars,
         "source": "live_or_cache",
+    }
+
+
+@router.get("/monitor/analysis/{symbol}", response_model=TickerAnalysisResponse)
+def get_monitor_analysis(symbol: str):
+    """Multi-timeframe RSI series (4-hour, weekly) and drawdown-from-all-time-high.
+
+    Powers the dedicated 4H/Weekly RSI charts and the drawdown badge in the UI.
+    Reuses the same RSI(14) engine and timeframe rules as the signal metrics.
+    """
+    ticker = symbol.upper()
+    fetcher = get_fetcher()
+
+    rsi_4h_series = _rsi_series_for_timeframe(
+        fetcher, ticker, period="1mo", interval="60m", resample_rule="4h"
+    )
+    rsi_weekly_series = _rsi_series_for_timeframe(
+        fetcher, ticker, period="2y", interval="1wk"
+    )
+
+    rsi_4h_points = _rsi_series_points(rsi_4h_series)
+    rsi_weekly_points = _rsi_series_points(rsi_weekly_series)
+    drawdown = _calculate_drawdown(fetcher, ticker)
+
+    return {
+        "symbol": ticker,
+        "rsi_4h": {
+            "interval": "4h",
+            "points": rsi_4h_points,
+            "latest": rsi_4h_points[-1]["value"] if rsi_4h_points else None,
+        },
+        "rsi_weekly": {
+            "interval": "1wk",
+            "points": rsi_weekly_points,
+            "latest": rsi_weekly_points[-1]["value"] if rsi_weekly_points else None,
+        },
+        "drawdown": drawdown,
     }
 
 

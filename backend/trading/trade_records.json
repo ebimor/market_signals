@@ -11,7 +11,9 @@
     "AMZN",
     "VISA",
     "MA",
-    "RY.TO"
+    "RY.TO",
+    "QQQ",
+    "SPY"
   ],
   "executed_trades": [
     {
@@ -117,5 +119,5 @@
       "notes": "Manual entry"
     }
   ],
-  "saved_at": "2026-05-22T11:46:32.866734"
+  "saved_at": "2026-05-27T15:49:48.564754"
 }
